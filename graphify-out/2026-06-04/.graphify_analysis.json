@@ -1,0 +1,102 @@
+{
+  "communities": {
+    "0": [
+      "claude_graph_report",
+      "claude_graphify",
+      "claude_graphify_out",
+      "claude_graphify_update",
+      "claude_wiki_index"
+    ],
+    "1": [
+      "claude_graph_json",
+      "claude_graphify_explain",
+      "claude_graphify_path",
+      "claude_graphify_query"
+    ],
+    "2": [
+      "claude_settings",
+      "claude_settings_hooks",
+      "claude_settings_hooks_pretooluse"
+    ],
+    "3": [
+      "claude_settings_local",
+      "claude_settings_local_permissions",
+      "claude_settings_local_permissions_allow"
+    ]
+  },
+  "cohesion": {
+    "0": 0.4,
+    "1": 0.5,
+    "2": 0.6666666666666666,
+    "3": 0.6666666666666666
+  },
+  "gods": [
+    {
+      "id": "claude_graphify_out",
+      "label": "graphify-out/",
+      "degree": 4
+    },
+    {
+      "id": "claude_graph_json",
+      "label": "graph.json",
+      "degree": 4
+    },
+    {
+      "id": "claude_settings_hooks",
+      "label": "hooks",
+      "degree": 2
+    },
+    {
+      "id": "claude_settings_local_permissions",
+      "label": "permissions",
+      "degree": 2
+    },
+    {
+      "id": "claude_graphify",
+      "label": "Graphify Project",
+      "degree": 2
+    },
+    {
+      "id": "claude_settings_hooks_pretooluse",
+      "label": "PreToolUse",
+      "degree": 1
+    },
+    {
+      "id": "claude_settings_local_permissions_allow",
+      "label": "allow",
+      "degree": 1
+    },
+    {
+      "id": "claude_graphify_query",
+      "label": "graphify query",
+      "degree": 1
+    },
+    {
+      "id": "claude_graphify_path",
+      "label": "graphify path",
+      "degree": 1
+    },
+    {
+      "id": "claude_graphify_explain",
+      "label": "graphify explain",
+      "degree": 1
+    }
+  ],
+  "surprises": [
+    {
+      "source": "graphify-out/",
+      "target": "graph.json",
+      "source_files": [
+        "CLAUDE.md",
+        "CLAUDE.md"
+      ],
+      "confidence": "INFERRED",
+      "relation": "references",
+      "note": "Bridges community 0 \u2192 community 1"
+    }
+  ],
+  "tokens": {
+    "input": 514,
+    "output": 1023
+  }
+}
