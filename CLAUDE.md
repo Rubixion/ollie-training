@@ -1,3 +1,9 @@
+## Trained models — NEVER DELETE
+
+`app_checkpoint.pt` and `app_best.pt` are the user's trained model weights and took a long time to train.
+**Never delete, overwrite, or modify these files under any circumstances.**
+If code changes require a fresh start, tell the user and let them decide.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.

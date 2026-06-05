@@ -18,28 +18,34 @@ import matplotlib.pyplot as plt
 import kagglehub
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as T
 from PIL import Image
 
-DEVICE     = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-IMAGE_SIZE = 64   # 64×64 colour — fast on CPU, much better than 32×32 grayscale
+DEVICE         = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+IMAGE_SIZE     = 96    # larger input gives the residual backbone more signal
+EMBEDDING_SIZE = 256   # exported so app.py stays in sync
 
 
 # ── transforms ────────────────────────────────────────────────────────────────
 
 train_transform = T.Compose([
-    T.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+    T.Resize(IMAGE_SIZE + 20),
+    T.RandomCrop(IMAGE_SIZE),               # spatial augmentation
     T.RandomHorizontalFlip(),
-    T.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.2),
-    T.RandomAffine(degrees=10, translate=(0.05, 0.05)),
+    T.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.3, hue=0.05),
+    T.RandomGrayscale(p=0.1),               # teaches shape over colour
+    T.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0)),
+    T.RandomAffine(degrees=15, translate=(0.05, 0.05), scale=(0.9, 1.1)),
     T.ToTensor(),
     T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
 ])
 
 test_transform = T.Compose([
-    T.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+    T.Resize(IMAGE_SIZE + 20),
+    T.CenterCrop(IMAGE_SIZE),
     T.ToTensor(),
     T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
 ])
@@ -49,64 +55,124 @@ test_transform = T.Compose([
 
 class FacePairDataset(Dataset):
     """
-    pairs: list of (path1, path2, label)
-    Images are loaded from disk on demand — no RAM spike at startup.
+    pairs: list of (path1, path2, label).
+    feature_cache: optional dict {path -> np.ndarray (FEAT_DIM,)}.
+      When provided, __getitem__ returns (img1, img2, label, feat1, feat2).
+      When None, returns (img1, img2, label) — backward-compatible.
     """
-    def __init__(self, pairs, transform):
-        self.pairs = pairs
-        self.transform = transform
+    def __init__(self, pairs, transform, feature_cache=None):
+        self.pairs         = pairs
+        self.transform     = transform
+        self.feature_cache = feature_cache
+        # infer zero-vector dimension from cache; default to 12 for compat
+        sample = next(iter(feature_cache.values()), None) if feature_cache else None
+        self._zero = np.zeros(len(sample) if sample is not None else 12, dtype=np.float32)
 
     def __len__(self):
         return len(self.pairs)
 
     def __getitem__(self, idx):
         p1, p2, label = self.pairs[idx]
-        img1 = self.transform(Image.open(p1).convert('RGB'))
-        img2 = self.transform(Image.open(p2).convert('RGB'))
-        return img1, img2, torch.tensor(label, dtype=torch.float32)
+        img1    = self._open(p1)
+        img2    = self._open(p2)
+        label_t = torch.tensor(label, dtype=torch.float32)
+        if self.feature_cache is not None:
+            f1 = torch.tensor(self.feature_cache.get(p1, self._zero), dtype=torch.float32)
+            f2 = torch.tensor(self.feature_cache.get(p2, self._zero), dtype=torch.float32)
+            return img1, img2, label_t, f1, f2
+        return img1, img2, label_t
+
+    def _open(self, path):
+        try:
+            return self.transform(Image.open(path).convert('RGB'))
+        except Exception:
+            # corrupt / truncated file — return a black placeholder
+            return self.transform(Image.new('RGB', (IMAGE_SIZE, IMAGE_SIZE)))
 
 
 # ── model ──────────────────────────────────────────────────────────────────────
 
-def conv_block(in_c, out_c, dropout=0.15):
-    return nn.Sequential(
-        nn.Conv2d(in_c, out_c, kernel_size=3, padding=1, bias=False),
-        nn.BatchNorm2d(out_c),
-        nn.ReLU(inplace=True),
-        nn.MaxPool2d(2, 2),
-        nn.Dropout2d(dropout),
-    )
+class _ResBlock(nn.Module):
+    """Two 3×3 convs with a residual skip. stride=2 halves spatial dimensions."""
+    def __init__(self, ch_in, ch_out, stride=1):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(ch_in, ch_out, 3, stride=stride, padding=1, bias=False),
+            nn.BatchNorm2d(ch_out),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(ch_out, ch_out, 3, padding=1, bias=False),
+            nn.BatchNorm2d(ch_out),
+        )
+        self.skip = nn.Sequential(
+            nn.Conv2d(ch_in, ch_out, 1, stride=stride, bias=False),
+            nn.BatchNorm2d(ch_out),
+        ) if (ch_in != ch_out or stride != 1) else nn.Identity()
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        return self.relu(self.conv(x) + self.skip(x))
 
 
 class SiameseNet(nn.Module):
-    def __init__(self, embedding_size=128, dropout=0.4):
+    def __init__(self, embedding_size=EMBEDDING_SIZE, dropout=0.4, feat_dim=0):
+        """
+        Residual backbone (96×96 → 512-d) fused with optional geometric face
+        features (hair colour, skin tone, jaw shape, iris colour, EAR, etc.)
+        before the similarity head.
+        """
         super().__init__()
-        # 64 → 32 → 16 → 8, then global avg pool → 1×1
+        self.feat_dim = feat_dim
+
+        # Stem + 3 residual stages: 96 → 48 → 24 → 12 → pool → 512-d
         self.backbone = nn.Sequential(
-            conv_block(3,   32,  0.10),
-            conv_block(32,  64,  0.15),
-            conv_block(64, 128,  0.20),
+            nn.Conv2d(3, 64, 3, padding=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            _ResBlock(64,  128, stride=2),   # 48×48
+            _ResBlock(128, 128),
+            _ResBlock(128, 256, stride=2),   # 24×24
+            _ResBlock(256, 256),
+            _ResBlock(256, 512, stride=2),   # 12×12
+            _ResBlock(512, 512),
             nn.AdaptiveAvgPool2d(1),
         )
         self.embedder = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(128, 256),
+            nn.Linear(512, 512),
+            nn.BatchNorm1d(512),
             nn.ReLU(inplace=True),
             nn.Dropout(dropout),
-            nn.Linear(256, embedding_size),
-            nn.ReLU(inplace=True),
+            nn.Linear(512, embedding_size),
         )
+
+        if feat_dim > 0:
+            self.feat_encoder = nn.Sequential(
+                nn.Linear(feat_dim, 64),
+                nn.BatchNorm1d(64),
+                nn.ReLU(inplace=True),
+                nn.Linear(64, 64),
+            )
+            combined_dim = embedding_size + 64
+        else:
+            combined_dim = embedding_size
+
         self.head = nn.Sequential(
-            nn.Linear(embedding_size, 1),
+            nn.Linear(combined_dim, 64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, 1),
             nn.Sigmoid(),
         )
 
-    def get_embedding(self, x):
-        return self.embedder(self.backbone(x))
+    def get_embedding(self, x, feats=None):
+        cnn_emb = F.normalize(self.embedder(self.backbone(x)), p=2, dim=1)
+        if feats is not None and self.feat_dim > 0:
+            combined = torch.cat([cnn_emb, self.feat_encoder(feats)], dim=1)
+            return F.normalize(combined, p=2, dim=1)
+        return cnn_emb
 
-    def forward(self, x1, x2):
-        e1 = self.get_embedding(x1)
-        e2 = self.get_embedding(x2)
+    def forward(self, x1, x2, f1=None, f2=None):
+        e1  = self.get_embedding(x1, f1)
+        e2  = self.get_embedding(x2, f2)
         sim = self.head(torch.abs(e1 - e2)).squeeze(1)
         return sim, e1, e2
 
@@ -227,6 +293,7 @@ def run_epoch(model, loader, criterion, optimizer, training):
         if training:
             optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
 
         total_loss += loss.item() * len(labels)
@@ -286,7 +353,7 @@ def main():
                               batch_size=32, shuffle=False, num_workers=0)
 
     # ── model setup ───────────────────────────────────────────────────────────
-    model     = SiameseNet(embedding_size=128, dropout=0.25).to(DEVICE)
+    model     = SiameseNet(embedding_size=EMBEDDING_SIZE, dropout=0.25).to(DEVICE)
     criterion = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=4, factor=0.5)
@@ -301,7 +368,7 @@ def main():
     train_accs, test_accs, epoch_log = [], [], []
 
     if os.path.exists(CHECKPOINT):
-        ckpt = torch.load(CHECKPOINT, map_location=DEVICE)
+        ckpt = torch.load(CHECKPOINT, map_location=DEVICE, weights_only=False)
         model.load_state_dict(ckpt['model'])
         optimizer.load_state_dict(ckpt['optimizer'])
         scheduler.load_state_dict(ckpt['scheduler'])
@@ -362,7 +429,7 @@ def main():
     # ── sample predictions (scrollable) ──────────────────────────────────────────
     from matplotlib.widgets import Button as MplButton
 
-    model.load_state_dict(torch.load("best_model.pt", map_location=DEVICE))
+    model.load_state_dict(torch.load("best_model.pt", map_location=DEVICE, weights_only=False))
     model.eval()
 
     # pre-compute all test predictions so page flipping is instant

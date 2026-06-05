@@ -8,5 +8,85 @@
     "mtime": 1780613101.2054713,
     "ast_hash": "907a97d626cfff8260821da672be51eb",
     "semantic_hash": "907a97d626cfff8260821da672be51eb"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\activation_function.py": {
+    "mtime": 1780614920.3429492,
+    "ast_hash": "1f94abaf05a1843fc4026e194bb28cd5",
+    "semantic_hash": "1f94abaf05a1843fc4026e194bb28cd5"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\app.py": {
+    "mtime": 1780640321.5741525,
+    "ast_hash": "70f8b6a82e3957f6b1b69eabcdcfaa7a",
+    "semantic_hash": "70f8b6a82e3957f6b1b69eabcdcfaa7a"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\celebrity_scraper.py": {
+    "mtime": 1780643421.5812843,
+    "ast_hash": "447ebbf994e51ff603d163cff65ca54e",
+    "semantic_hash": "447ebbf994e51ff603d163cff65ca54e"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\conv_layer.py": {
+    "mtime": 1780616406.6045794,
+    "ast_hash": "3019d71e0be40d6bfdf883e909fd47de",
+    "semantic_hash": "3019d71e0be40d6bfdf883e909fd47de"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\face_features.py": {
+    "mtime": 1780639694.887494,
+    "ast_hash": "4656a4556a37129889724bfa855643b4",
+    "semantic_hash": "4656a4556a37129889724bfa855643b4"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\face_recognition.py": {
+    "mtime": 1780619182.4664965,
+    "ast_hash": "4e4190bc0d5f1cbd1ebc2909fa1c6c83",
+    "semantic_hash": "4e4190bc0d5f1cbd1ebc2909fa1c6c83"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\flatten_layer.py": {
+    "mtime": 1780616417.486626,
+    "ast_hash": "717f331df77c3652d23d8524009f243e",
+    "semantic_hash": "717f331df77c3652d23d8524009f243e"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\lfw_pytorch.py": {
+    "mtime": 1780643415.6408737,
+    "ast_hash": "57e2f0194830b650a89025f0a820f68d",
+    "semantic_hash": "57e2f0194830b650a89025f0a820f68d"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\lfw_train.py": {
+    "mtime": 1780620307.2711596,
+    "ast_hash": "508f07baeb70a9b46454f630cd5863ab",
+    "semantic_hash": "508f07baeb70a9b46454f630cd5863ab"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\main.py": {
+    "mtime": 1780615490.6238263,
+    "ast_hash": "9e073c40752b2a78157a022825cc87a5",
+    "semantic_hash": "9e073c40752b2a78157a022825cc87a5"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\main_cnn.py": {
+    "mtime": 1780617164.8217888,
+    "ast_hash": "12cba613d8add4b8127e05c057c6d170",
+    "semantic_hash": "12cba613d8add4b8127e05c057c6d170"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\network.py": {
+    "mtime": 1780615416.8053012,
+    "ast_hash": "a6043573aaf77654221734916f247455",
+    "semantic_hash": "a6043573aaf77654221734916f247455"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\network_layer.py": {
+    "mtime": 1780615436.436912,
+    "ast_hash": "eb0a76b8c34763743cd46d6cd062ea95",
+    "semantic_hash": "eb0a76b8c34763743cd46d6cd062ea95"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\pool_layer.py": {
+    "mtime": 1780616413.936627,
+    "ast_hash": "f8a56550ef4e3a63573610a61d421678",
+    "semantic_hash": "f8a56550ef4e3a63573610a61d421678"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\siamese_network.py": {
+    "mtime": 1780619153.8078556,
+    "ast_hash": "757e97fe23a431423f6c4060ce3838ce",
+    "semantic_hash": "757e97fe23a431423f6c4060ce3838ce"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\CLAUDE.md": {
+    "mtime": 1780613160.244515,
+    "ast_hash": "8a6643a420fdad6bfb583523bc6cef16",
+    "semantic_hash": "8a6643a420fdad6bfb583523bc6cef16"
   }
 }
