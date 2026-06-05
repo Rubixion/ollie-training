@@ -46,19 +46,36 @@ ENV/
 Thumbs.db
 desktop.ini
 
-
 # Logs
 *.log
 logs/
 
-# Model checkpoints / data
+# Trained model weights (large binary files — back up manually or use Git LFS)
+# app_checkpoint.pt and app_best.pt are your trained models — never delete them
 *.pt
 *.pth
 *.ckpt
 *.h5
+
+# Generated caches (rebuilt automatically on first run)
 *.pkl
 *.npy
 *.npz
+feature_cache.pkl
+embed_cache.npz
+
+# Celebrity image dataset (thousands of images — too large for git)
+celebrity_data/
+
+# LFW dataset (downloaded automatically via kagglehub)
 data/
 datasets/
-.claude
+
+# Human feedback labels (local to your machine)
+feedback_pairs.csv
+
+# Graphify knowledge graph outputs (regenerated with /graphify)
+graphify-out/
+
+# Claude Code project memory (machine-local)
+.claude/
