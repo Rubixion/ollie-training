@@ -1,4 +1,7 @@
 ddgs==9.14.4
+faiss-cpu==1.14.2
+insightface
+onnxruntime-gpu
 gradio==6.16.0
 groq==1.4.0
 kagglehub==1.0.1

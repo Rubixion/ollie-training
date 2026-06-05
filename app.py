@@ -13,7 +13,9 @@ import csv
 import random
 import threading
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
+import faiss
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
@@ -29,7 +31,7 @@ from lfw_pytorch import (
     load_csv_pairs, generate_pairs_from_filesystem,
     get_names_from_csv,
 )
-from face_features import build_feature_cache, extract_face_features, FEAT_DIM, _ZERO_VEC
+from face_features import build_feature_cache, extract_face_features, FEAT_DIM, _ZERO_VEC, using_gpu
 from celebrity_scraper import (
     scrape_all, get_scraped_pairs, count_images, clean_non_faces,
     ai_verify_all, CELEBRITIES, SCRAPE_ROOT,
@@ -516,6 +518,14 @@ def get_scrape_status():
 
 # ── IDENTIFY TAB ──────────────────────────────────────────────────────────────
 
+def _build_faiss(embeddings: np.ndarray):
+    """Build an exact L2 FAISS index from a float32 (N, D) array."""
+    emb = np.ascontiguousarray(embeddings, dtype=np.float32)
+    idx = faiss.IndexFlatL2(emb.shape[1])
+    idx.add(emb)
+    return idx
+
+
 def _build_embed_index(status_cb=None):
     global _embed_index
     if _embed_index is not None:
@@ -524,11 +534,15 @@ def _build_embed_index(status_cb=None):
     if os.path.exists(EMBED_CACHE):
         if status_cb:
             status_cb("Loading cached embedding index...")
-        d = np.load(EMBED_CACHE, allow_pickle=True)
-        feats = d['features'] if 'features' in d else np.zeros((len(d['names']), FEAT_DIM), dtype=np.float32)
-        _embed_index = (d['names'].tolist(), d['paths'].tolist(), d['embeddings'], feats)
+        d     = np.load(EMBED_CACHE, allow_pickle=True)
+        names = d['names'].tolist()
+        paths = d['paths'].tolist()
+        embs  = d['embeddings'].astype(np.float32)
+        feats = d['features'] if 'features' in d else np.zeros((len(names), FEAT_DIM), dtype=np.float32)
+        fidx  = _build_faiss(embs)
+        _embed_index = (names, paths, fidx, feats)
         if status_cb:
-            status_cb(f"Index loaded: {len(_embed_index[0])} images.")
+            status_cb(f"Index loaded: {len(names)} images  (FAISS ready).")
         return _embed_index
 
     model      = _load_model()
@@ -537,7 +551,6 @@ def _build_embed_index(status_cb=None):
 
     all_names, all_paths = [], []
 
-    # LFW images
     root = _lfw_root()
     if os.path.isdir(root):
         for person in sorted(os.listdir(root)):
@@ -549,7 +562,6 @@ def _build_embed_index(status_cb=None):
                     all_names.append(person)
                     all_paths.append(os.path.join(folder, fname))
 
-    # Scraped celebrity images
     if os.path.isdir(SCRAPE_ROOT):
         for celeb in sorted(os.listdir(SCRAPE_ROOT)):
             folder = os.path.join(SCRAPE_ROOT, celeb)
@@ -562,20 +574,18 @@ def _build_embed_index(status_cb=None):
 
     total = len(all_paths)
     if status_cb:
-        status_cb(f"Embedding {total} images (LFW + celebrities) — this takes ~1-3 min on GPU...")
+        status_cb(f"Embedding {total} images — this takes ~1-3 min on GPU...")
 
     all_embs  = []
     all_feats = []
     for i in range(0, total, 64):
-        batch_paths  = all_paths[i:i+64]
-        imgs         = []
-        batch_feats  = []
+        batch_paths = all_paths[i:i+64]
+        imgs, batch_feats = [], []
         for p in batch_paths:
             try:
                 imgs.append(test_transform(Image.open(p).convert('RGB')))
             except Exception:
                 imgs.append(test_transform(Image.new('RGB', (IMAGE_SIZE, IMAGE_SIZE))))
-            # Use training cache — covers most images; zeros for the rest
             batch_feats.append(feat_cache.get(p, _ZERO_VEC))
 
         feat_arr = np.stack(batch_feats).astype(np.float32)
@@ -586,19 +596,86 @@ def _build_embed_index(status_cb=None):
         all_feats.append(feat_arr)
 
         if status_cb and (i // 64) % 10 == 0:
-            status_cb(f"  Embedded {min(i + 64, total)}/{total} images...")
+            status_cb(f"  Embedded {min(i+64, total)}/{total}...")
 
-    embeddings   = np.concatenate(all_embs,  axis=0)
+    embeddings   = np.concatenate(all_embs,  axis=0).astype(np.float32)
     features_arr = np.concatenate(all_feats, axis=0)
     np.savez(EMBED_CACHE,
              names=np.array(all_names, dtype=object),
              paths=np.array(all_paths, dtype=object),
              embeddings=embeddings,
              features=features_arr)
-    _embed_index = (all_names, all_paths, embeddings, features_arr)
+    fidx = _build_faiss(embeddings)
+    _embed_index = (all_names, all_paths, fidx, features_arr)
     if status_cb:
-        status_cb(f"Index built: {total} images. Saved to cache.")
+        status_cb(f"Index built: {total} images  (FAISS ready).")
     return _embed_index
+
+
+def build_feature_index():
+    """
+    Generator. Runs parallel MediaPipe extraction on every index image that
+    currently has zero features, then updates embed_cache.npz in-place and
+    resets the in-memory index so the next search uses real features.
+    """
+    global _embed_index
+
+    if not os.path.exists(EMBED_CACHE):
+        yield "No embed cache found — run a search first to build the embedding index."; return
+
+    yield "Loading embed cache..."
+    d     = np.load(EMBED_CACHE, allow_pickle=True)
+    paths = d['paths'].tolist()
+    feats = d['features'].copy() if 'features' in d else np.zeros((len(paths), FEAT_DIM), dtype=np.float32)
+
+    missing = [i for i, f in enumerate(feats) if np.all(f == 0)]
+    total   = len(missing)
+    if total == 0:
+        yield f"All {len(paths)} images already have features — nothing to do."; return
+
+    if using_gpu():
+        yield f"Extracting features for {total}/{len(paths)} images using InsightFace GPU..."
+        done = 0
+        for idx in missing:
+            try:
+                feats[idx] = extract_face_features(Image.open(paths[idx]).convert('RGB'))
+            except Exception:
+                pass
+            done += 1
+            if done % 500 == 0 or done == total:
+                yield f"  {done}/{total} features extracted  (GPU)..."
+    else:
+        workers = min(8, (os.cpu_count() or 4))
+        yield f"Extracting features for {total}/{len(paths)} images using {workers} CPU workers..."
+        done = 0
+        lock = threading.Lock()
+
+        def _extract(idx):
+            try:
+                return idx, extract_face_features(Image.open(paths[idx]).convert('RGB'))
+            except Exception:
+                return idx, _ZERO_VEC.copy()
+
+        with ThreadPoolExecutor(max_workers=workers) as exe:
+            futures = {exe.submit(_extract, i): i for i in missing}
+            for fut in as_completed(futures):
+                i2, feat = fut.result()
+                with lock:
+                    feats[i2] = feat
+                    done += 1
+                    if done % 500 == 0 or done == total:
+                        yield f"  {done}/{total} features extracted  (CPU ×{workers})..."
+
+    yield "Saving updated features to embed cache..."
+    np.savez(EMBED_CACHE,
+             names=d['names'],
+             paths=d['paths'],
+             embeddings=d['embeddings'],
+             features=feats)
+
+    _embed_index = None  # force reload on next search
+    nonzero = int(np.any(feats != 0, axis=1).sum())
+    yield f"Done. {nonzero}/{len(paths)} images now have face features. Re-ranking will be much more accurate."
 
 
 def find_dataset_matches(image):
@@ -634,7 +711,7 @@ def find_dataset_matches(image):
     def index_progress(msg):
         log_buf.append(msg)
 
-    names, paths, embeddings, index_features = _build_embed_index(status_cb=index_progress)
+    names, paths, faiss_idx, index_features = _build_embed_index(status_cb=index_progress)
 
     # Show index progress in the textbox
     yield "\n".join(log_buf), []
@@ -643,36 +720,35 @@ def find_dataset_matches(image):
         yield "\n".join(log_buf) + "\n\nNo images in embed index.", []
         return
 
-    dists    = np.sqrt(((embeddings - q_emb) ** 2).sum(axis=1))
-    top200   = np.argsort(dists)[:200]
+    q_emb_f = np.ascontiguousarray(q_emb.reshape(1, -1), dtype=np.float32)
+    D, I    = faiss_idx.search(q_emb_f, 200)
+    top200_idx  = I[0]
+    top200_dist = np.sqrt(np.maximum(D[0], 0.0))
 
     # ── feature re-ranking ────────────────────────────────────────────────────
-    # Re-score top-200 by embedding + explicit demographic feature penalties.
-    # index_features[i] is guaranteed to exist for every index entry.
     q_has_feats = not np.all(q_feats == 0)
 
     scored = []
-    for i in top200:
-        embed_dist = float(dists[i])
+    for abs_i, embed_dist in zip(top200_idx, top200_dist):
+        if abs_i < 0:
+            continue
+        embed_dist = float(embed_dist)
 
         if q_has_feats:
-            c_feats = index_features[i]
+            c_feats = index_features[abs_i]
             c_has   = not np.all(c_feats == 0)
             if c_has:
-                # Skin tone L (feats[20]) — most important, weight 5×
                 skin_diff  = abs(float(q_feats[20]) - float(c_feats[20]))
-                # Hair hue circular distance, weight 2×
                 hh         = abs(float(q_feats[17]) - float(c_feats[17]))
                 hair_diff  = min(hh, 1.0 - hh)
-                # Face shape w/h, weight 1×
                 shape_diff = abs(float(q_feats[11]) - float(c_feats[11]))
                 penalty    = 5.0 * skin_diff + 2.0 * hair_diff + shape_diff
             else:
-                penalty = 0.30   # no landmarks on candidate — deprioritise
+                penalty = 0.30
         else:
-            penalty = 0.0        # no query features — pure CNN
+            penalty = 0.0
 
-        scored.append((embed_dist + penalty, i, embed_dist))
+        scored.append((embed_dist + penalty, abs_i, embed_dist))
 
     scored.sort(key=lambda x: x[0])
 
@@ -686,8 +762,8 @@ def find_dataset_matches(image):
     gallery_items = []
     seen_names    = {}
 
-    for combined, i, embed_dist in scored:
-        display = names[i].replace('_', ' ')
+    for combined, abs_i, embed_dist in scored:
+        display = names[abs_i].replace('_', ' ')
         sim_pct = max(0.0, (1.0 - embed_dist / MARGIN)) * 100
 
         seen_names[display] = seen_names.get(display, 0) + 1
@@ -695,7 +771,7 @@ def find_dataset_matches(image):
             continue
 
         try:
-            img_match = _pil_square(Image.open(paths[i]).convert('RGB'), 160)
+            img_match = _pil_square(Image.open(paths[abs_i]).convert('RGB'), 160)
             caption   = f"{display}  ({sim_pct:.0f}%)"
             gallery_items.append((img_match, caption))
         except Exception:
@@ -886,9 +962,20 @@ with gr.Blocks(title="Face Verification") as app:
             gallery  = gr.Gallery(label="Closest matches in dataset",
                                   columns=4, height=420)
 
+            gr.Markdown("---")
+            gr.Markdown(
+                "**Build Feature Index** — runs MediaPipe on every image in the dataset "
+                "using parallel CPU workers (~2–4 min for 17K images, scales well).  \n"
+                "Run this once after building the embed cache so re-ranking has real skin/hair/shape data."
+            )
+            btn_feat  = gr.Button("Build Feature Index", variant="secondary")
+            feat_log  = gr.Textbox(label="Feature Index Log", lines=6, interactive=False)
+
             btn_id.click(find_dataset_matches, inputs=img_in,
                          outputs=[diag_box, gallery],
                          show_progress="hidden")
+            btn_feat.click(build_feature_index, inputs=None,
+                           outputs=feat_log, show_progress="hidden")
 
         # ── TAB 4: FEEDBACK ───────────────────────────────────────────────────
         with gr.Tab("Give Feedback"):
