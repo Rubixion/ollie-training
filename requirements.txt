@@ -1,0 +1,10 @@
+ddgs==9.14.4
+gradio==6.16.0
+groq==1.4.0
+kagglehub==1.0.1
+mediapipe==0.10.9
+numpy==2.4.6
+opencv-contrib-python==4.13.0.92
+pillow==12.2.0
+torch==2.6.0+cu124
+torchvision==0.21.0+cu124

@@ -562,7 +562,7 @@ def _build_embed_index(status_cb=None):
 
     total = len(all_paths)
     if status_cb:
-        status_cb(f"Embedding {total} images (LFW + celebrities) — this takes ~1-2 min...")
+        status_cb(f"Embedding {total} images (LFW + celebrities) — this takes ~1-3 min on GPU...")
 
     all_embs  = []
     all_feats = []
@@ -572,13 +572,11 @@ def _build_embed_index(status_cb=None):
         batch_feats  = []
         for p in batch_paths:
             try:
-                pil = Image.open(p).convert('RGB')
-                imgs.append(test_transform(pil))
+                imgs.append(test_transform(Image.open(p).convert('RGB')))
             except Exception:
-                pil = Image.new('RGB', (IMAGE_SIZE, IMAGE_SIZE))
-                imgs.append(test_transform(pil))
-            # Extract geometric features directly — don't rely on training cache
-            batch_feats.append(feat_cache.get(p) or extract_face_features(pil))
+                imgs.append(test_transform(Image.new('RGB', (IMAGE_SIZE, IMAGE_SIZE))))
+            # Use training cache — covers most images; zeros for the rest
+            batch_feats.append(feat_cache.get(p, _ZERO_VEC))
 
         feat_arr = np.stack(batch_feats).astype(np.float32)
         imgs_t   = torch.stack(imgs).to(DEVICE)
