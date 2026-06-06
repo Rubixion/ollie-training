@@ -28,7 +28,7 @@ from lfw_pytorch import (
     SiameseNet, FacePairDataset,
     train_transform, test_transform,
     DEVICE, EMBEDDING_SIZE, IMAGE_SIZE,
-    load_csv_pairs, generate_pairs_from_filesystem,
+    load_csv_pairs, generate_pairs_from_filesystem, generate_pairs_from_flat_dir,
     get_names_from_csv,
 )
 from face_features import build_feature_cache, extract_face_features, FEAT_DIM, _ZERO_VEC, using_gpu
@@ -42,7 +42,8 @@ APP_BEST       = "app_best.pt"
 FEEDBACK_CSV   = "feedback_pairs.csv"
 EMBED_CACHE    = "embed_cache.npz"
 FEAT_CACHE     = "feature_cache.pkl"
-MARGIN         = 2.0   # max L2 dist on unit sphere = 2; keeps loss non-zero from init
+VGG_PATH_FILE  = "vggface2_path.txt"   # persists the kagglehub download location
+MARGIN         = 2.0
 
 
 # ── contrastive loss ──────────────────────────────────────────────────────────
@@ -77,6 +78,63 @@ def _lfw_root():
     return os.path.join(_get_dataset(), "lfw-deepfunneled", "lfw-deepfunneled")
 
 
+def _vgg_root():
+    """Return the VGGFace2 train directory, or None if not downloaded yet."""
+    if not os.path.exists(VGG_PATH_FILE):
+        return None
+    base = open(VGG_PATH_FILE).read().strip()
+    if not os.path.isdir(base):
+        return None
+    for candidate in [os.path.join(base, 'train'), base]:
+        if os.path.isdir(candidate):
+            subdirs = [d for d in os.listdir(candidate)
+                       if os.path.isdir(os.path.join(candidate, d))]
+            if len(subdirs) > 10:
+                return candidate
+    return None
+
+
+def _vgg_status():
+    root = _vgg_root()
+    if root is None:
+        return "VGGFace2: not downloaded"
+    identities = sum(1 for d in os.listdir(root)
+                     if os.path.isdir(os.path.join(root, d)))
+    images = sum(
+        len([f for f in os.listdir(os.path.join(root, d))
+             if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
+        for d in os.listdir(root)
+        if os.path.isdir(os.path.join(root, d))
+    )
+    return f"VGGFace2: {images:,} images across {identities:,} identities  ({root})"
+
+
+def download_vggface2():
+    """Generator — downloads VGGFace2 from Kaggle and reports progress."""
+    yield "Searching Kaggle for VGGFace2 dataset..."
+    KAGGLE_IDS = ["hearfool/vggface2", "vasukipatel/face-recognition-dataset"]
+    base = None
+    for kid in KAGGLE_IDS:
+        try:
+            yield f"Trying {kid} ..."
+            base = kagglehub.dataset_download(kid)
+            yield f"Downloaded to: {base}"
+            break
+        except Exception as e:
+            yield f"  {kid} failed: {e}"
+
+    if base is None:
+        yield ("Could not find VGGFace2 on Kaggle automatically.\n"
+               "Go to kaggle.com, search 'VGGFace2', download manually,\n"
+               "then paste the path into vggface2_path.txt in this folder.")
+        return
+
+    with open(VGG_PATH_FILE, 'w') as f:
+        f.write(base)
+
+    yield _vgg_status()
+
+
 def _load_model(path=None):
     model = SiameseNet(embedding_size=EMBEDDING_SIZE, dropout=0.25, feat_dim=FEAT_DIM).to(DEVICE)
     src = path or (APP_BEST if os.path.exists(APP_BEST) else
@@ -109,111 +167,105 @@ def _pil_square(img, size):
 
 
 def _get_feat_cache():
-    """Return the in-memory feature cache, loading from disk if needed."""
     global _feat_cache
     if _feat_cache is None and os.path.exists(FEAT_CACHE):
         import pickle
         with open(FEAT_CACHE, 'rb') as f:
-            _feat_cache = pickle.load(f)
+            raw = pickle.load(f)
+        # Discard entries with wrong dimension (cache built with old FEAT_DIM)
+        _feat_cache = {k: v for k, v in raw.items() if len(v) == FEAT_DIM}
     return _feat_cache or {}
 
 
 # ── feature diagnostic ────────────────────────────────────────────────────────
 
 def _describe_features(feats):
-    """Human-readable breakdown of geometric features extracted from a face."""
     if np.all(feats == 0):
         return (
-            "Face detection:  FAILED — MediaPipe found no face in the image.\n"
-            "                 Using CNN visual embedding only.\n"
-            "                 Skin color, hair color, face shape are NOT being compared.\n\n"
+            "Face detection:  FAILED\n"
+            "                 No face found — CNN embedding only.\n"
+            "                 Skin, hair, face shape NOT compared.\n\n"
             "Tip: try a clearer, front-facing photo with good lighting."
         )
 
-    lines = ["Face detection:  OK (MediaPipe landmarks found)\n"]
+    detector = "InsightFace GPU" if using_gpu() else "MediaPipe CPU"
+    lines = [f"Face detection:  OK  ({detector})\n"]
 
-    # Skin tone — LAB L channel stored as L/255; cv2 L range is 0-255
-    L = feats[20] * 255
-    if L > 185:   skin_d = "very light"
-    elif L > 155: skin_d = "light"
-    elif L > 120: skin_d = "medium"
-    elif L > 85:  skin_d = "medium-dark"
-    else:         skin_d = "dark"
-    b_val = feats[22] * 255 - 128  # b > 0 = yellow/warm, b < 0 = blue/cool
-    warm = "warm" if b_val > 8 else ("cool" if b_val < -5 else "neutral")
-    lines.append(f"Skin tone:       {skin_d}  (L={L:.0f}, {warm} undertone)")
+    # Skin tone
+    L    = feats[20] * 255
+    bval = feats[22] * 255 - 128
+    skin_d = ("very light" if L>185 else "light" if L>155 else
+              "medium" if L>120 else "medium-dark" if L>85 else "dark")
+    warm   = "warm" if bval>8 else ("cool" if bval<-5 else "neutral")
+    lines.append(f"Skin tone:       {skin_d}  (L={L:.0f}, {warm})")
 
-    # Hair color — HSV stored as H/179, S/255, V/255
-    H = feats[17] * 179; S = feats[18] * 255; V = feats[19] * 255
-    if V < 40:
-        hair_d = "black"
-    elif S < 25:
-        hair_d = "white / silver" if V > 180 else "grey"
-    elif H < 15 or H > 165:
-        hair_d = "red / auburn"
-    elif H < 30:
-        hair_d = "dark brown"
-    elif H < 60:
-        hair_d = "blonde"
-    else:
-        hair_d = "brown"
+    # Hair color
+    H = feats[17]*179; S = feats[18]*255; V = feats[19]*255
+    hair_d = ("black"          if V < 40 else
+              "white/silver"   if S < 25 and V > 180 else
+              "grey"           if S < 25 else
+              "red/auburn"     if H < 15 or H > 165 else
+              "dark brown"     if H < 30 else
+              "blonde"         if H < 60 else "brown")
     lines.append(f"Hair color:      {hair_d}  (H={H:.0f}°, S={S:.0f}, V={V:.0f})")
 
-    # Eye color — average of both iris HSV (feats[3:6] right, feats[6:9] left)
-    iH = ((feats[3] + feats[6]) / 2) * 179
-    iS = ((feats[4] + feats[7]) / 2) * 255
-    iV = ((feats[5] + feats[8]) / 2) * 255
-    if iS < 25 or iV < 40:
-        eye_d = "dark brown / black"
-    elif iH < 20 or iH > 150:
-        eye_d = "brown"
-    elif iH < 45:
-        eye_d = "hazel / amber"
-    elif iH < 90:
-        eye_d = "green"
-    else:
-        eye_d = "blue"
+    # Hair length
+    hl   = feats[27]
+    hl_d = "long" if hl > 0.5 else ("medium" if hl > 0.2 else "short")
+    lines.append(f"Hair length:     {hl_d}  (score={hl:.2f})")
+
+    # Eye color
+    iH = ((feats[3]+feats[6])/2)*179; iS = ((feats[4]+feats[7])/2)*255
+    eye_d = ("dark brown/black" if iS<25 else
+             "brown"            if iH<20 or iH>150 else
+             "hazel/amber"      if iH<45 else
+             "green"            if iH<90 else "blue")
     lines.append(f"Eye color:       {eye_d}  (H={iH:.0f}°, S={iS:.0f})")
 
-    # Face shape — w/h ratio (feats[11])
-    ratio = feats[11]
-    shape_d = ("round / wide" if ratio > 0.90
-               else "oval" if ratio > 0.75
-               else "narrow / long")
+    # Face shape
+    ratio   = feats[11]
+    shape_d = ("round/wide" if ratio>0.90 else "oval" if ratio>0.75 else "narrow/long")
     lines.append(f"Face shape:      {shape_d}  (w/h={ratio:.2f})")
 
-    # Nose (feats[14]: nose_w / nose_h)
-    nose = feats[14]
-    nose_d = "broad" if nose > 1.4 else ("medium" if nose > 0.8 else "narrow")
-    lines.append(f"Nose:            {nose_d}  (w/h ratio={nose:.2f})")
+    # Facial proportions
+    enr = feats[24]; nmr = feats[25]; mcr = feats[26]
+    lines.append(f"Proportions:     eye→nose {enr:.2f}  nose→mouth {nmr:.2f}  mouth→chin {mcr:.2f}")
 
-    # Jaw shape (feats[12] chin_w, feats[13] mid_jaw_w, both / face_w)
+    # Nose
+    nose  = feats[14]
+    nose_d = "broad" if nose>1.4 else ("medium" if nose>0.8 else "narrow")
+    lines.append(f"Nose:            {nose_d}  (w/h={nose:.2f})")
+
+    # Jaw
     chin = feats[12]; mid = feats[13]
-    jaw_d = ("square" if chin > mid * 0.97
-             else "tapered / V-shape" if chin < mid * 0.87
-             else "slightly tapered")
-    lines.append(f"Jaw shape:       {jaw_d}  (chin={chin:.2f}, mid-jaw={mid:.2f})")
+    jaw_d = ("square"          if chin>mid*0.97 else
+             "tapered/V-shape" if chin<mid*0.87 else "slightly tapered")
+    if chin > 0 or mid > 0:
+        lines.append(f"Jaw shape:       {jaw_d}  (chin={chin:.2f}, mid={mid:.2f})")
 
-    # Eye spacing (feats[0]: eye_dist / face_w)
-    ed = feats[0]
-    esp = "wide-set" if ed > 0.45 else ("normal" if ed > 0.32 else "close-set")
+    # Eye spacing
+    ed  = feats[0]
+    esp = "wide-set" if ed>0.45 else ("normal" if ed>0.32 else "close-set")
     lines.append(f"Eye spacing:     {esp}  ({ed:.3f})")
 
-    # Lips (feats[15] lip_w / face_w, feats[16] lip_h / face_h)
-    lip_w = feats[15]; lip_h = feats[16]
-    lip_d = "full / wide" if lip_w > 0.50 else ("medium" if lip_w > 0.38 else "narrow")
-    lines.append(f"Lips:            {lip_d}  (width={lip_w:.2f}, height={lip_h:.3f})")
+    # Lips
+    lw = feats[15]; lh = feats[16]
+    lip_d = "full/wide" if lw>0.50 else ("medium" if lw>0.38 else "narrow")
+    lines.append(f"Lips:            {lip_d}  (w={lw:.2f}, h={lh:.3f})")
 
-    # Forehead (feats[23])
-    fore = feats[23]
-    fore_d = "high" if fore > 0.28 else ("medium" if fore > 0.18 else "low")
+    # Forehead
+    fore  = feats[23]
+    fore_d = "high" if fore>0.28 else ("medium" if fore>0.18 else "low")
     lines.append(f"Forehead:        {fore_d}  ({fore:.3f})")
 
-    lines.append("")
-    lines.append("Active modules:  CNN backbone  +  24-dim geometric features")
-    lines.append("                 (skin tone, hair, eyes, face shape, jaw,")
-    lines.append("                  nose, lips, forehead all fused into embedding)")
+    # Age / gender (InsightFace only)
+    age_n = feats[28]; gen = feats[29]
+    if age_n > 0:
+        age_yrs = int(age_n * 100)
+        gen_s   = "male" if gen > 0.5 else "female"
+        lines.append(f"Age / gender:    ~{age_yrs} yrs  ({gen_s})")
 
+    lines.append(f"\nFeatures:        32-dim  |  detector: {detector}")
     return "\n".join(lines)
 
 
@@ -235,6 +287,16 @@ def _train_worker():
         official  = load_csv_pairs(dp, "matchpairsDevTrain.csv", "mismatchpairsDevTrain.csv")
         generated = generate_pairs_from_filesystem(dp, exclude_people=test_people, max_pos=5000)
 
+        # VGGFace2 pairs (capped to avoid memory issues on small GPUs)
+        vgg_root = _vgg_root()
+        if vgg_root:
+            log("Loading VGGFace2 pairs...")
+            vgg_pairs = generate_pairs_from_flat_dir(
+                vgg_root, exclude_people=test_people, max_pos=50000)
+            log(f"  VGGFace2: {len(vgg_pairs)} pairs from {vgg_root}")
+        else:
+            vgg_pairs = []
+
         celeb_pairs = get_scraped_pairs(SCRAPE_ROOT)
         if celeb_pairs:
             log(f"Using {len(celeb_pairs)} scraped celebrity pairs.")
@@ -248,7 +310,7 @@ def _train_worker():
             if feedback:
                 log(f"Loaded {len(feedback)} human feedback pairs.")
 
-        train_pairs = official + generated + celeb_pairs + feedback
+        train_pairs = official + generated + vgg_pairs + celeb_pairs + feedback
         random.shuffle(train_pairs)
         log(f"Train: {len(train_pairs)} pairs  |  Test: {len(test_pairs)} pairs\n")
 
@@ -538,7 +600,9 @@ def _build_embed_index(status_cb=None):
         names = d['names'].tolist()
         paths = d['paths'].tolist()
         embs  = d['embeddings'].astype(np.float32)
-        feats = d['features'] if 'features' in d else np.zeros((len(names), FEAT_DIM), dtype=np.float32)
+        raw   = d['features'] if 'features' in d else None
+        feats = (raw if raw is not None and raw.shape[1] == FEAT_DIM
+                 else np.zeros((len(names), FEAT_DIM), dtype=np.float32))
         fidx  = _build_faiss(embs)
         _embed_index = (names, paths, fidx, feats)
         if status_cb:
@@ -678,11 +742,8 @@ def build_feature_index():
     yield f"Done. {nonzero}/{len(paths)} images now have face features. Re-ranking will be much more accurate."
 
 
-def find_dataset_matches(image):
-    """
-    Upload a face → embed it → find the closest matching images in the dataset.
-    Generator: yields progress updates so the UI stays live during index build.
-    """
+def find_dataset_matches(image, mode="CNN + Features"):
+    """Generator — yields (diag_text, gallery_items)."""
     if image is None:
         yield "Upload a face photo first.", []
         return
@@ -693,13 +754,17 @@ def find_dataset_matches(image):
 
     yield "Extracting face features...", []
 
-    model    = _load_model()
-    img_pil  = Image.fromarray(image).convert('RGB')
-    img_t    = test_transform(img_pil).unsqueeze(0).to(DEVICE)
-    q_feats  = extract_face_features(img_pil)
-    q_feat_t = torch.tensor(q_feats).unsqueeze(0).to(DEVICE)
-    with torch.no_grad():
-        q_emb = model.get_embedding(img_t, q_feat_t).cpu().numpy()[0]
+    model   = _load_model()
+    img_pil = Image.fromarray(image).convert('RGB')
+    q_feats = extract_face_features(img_pil)
+
+    # CNN embedding (skip for Features Only)
+    q_emb = None
+    if mode != "Features Only":
+        img_t    = test_transform(img_pil).unsqueeze(0).to(DEVICE)
+        q_feat_t = torch.tensor(q_feats).unsqueeze(0).to(DEVICE)
+        with torch.no_grad():
+            q_emb = model.get_embedding(img_t, q_feat_t).cpu().numpy()[0]
 
     diag_lines = ["── Uploaded image analysis ──────────────────────────\n"]
     diag_lines.append(_describe_features(q_feats))
@@ -720,44 +785,70 @@ def find_dataset_matches(image):
         yield "\n".join(log_buf) + "\n\nNo images in embed index.", []
         return
 
-    q_emb_f = np.ascontiguousarray(q_emb.reshape(1, -1), dtype=np.float32)
-    D, I    = faiss_idx.search(q_emb_f, 200)
-    top200_idx  = I[0]
-    top200_dist = np.sqrt(np.maximum(D[0], 0.0))
-
-    # ── feature re-ranking ────────────────────────────────────────────────────
     q_has_feats = not np.all(q_feats == 0)
-
     scored = []
-    for abs_i, embed_dist in zip(top200_idx, top200_dist):
-        if abs_i < 0:
-            continue
-        embed_dist = float(embed_dist)
 
-        if q_has_feats:
-            c_feats = index_features[abs_i]
-            c_has   = not np.all(c_feats == 0)
-            if c_has:
-                skin_diff  = abs(float(q_feats[20]) - float(c_feats[20]))
-                hh         = abs(float(q_feats[17]) - float(c_feats[17]))
-                hair_diff  = min(hh, 1.0 - hh)
-                shape_diff = abs(float(q_feats[11]) - float(c_feats[11]))
-                penalty    = 5.0 * skin_diff + 2.0 * hair_diff + shape_diff
-            else:
-                penalty = 0.30
+    if mode == "Features Only":
+        # ── pure feature distance search ─────────────────────────────────────
+        if not q_has_feats:
+            yield "\n".join(log_buf) + "\n\nFace detection failed — can't do Features Only search.", []
+            return
+        has_feats = np.any(index_features != 0, axis=1)
+        if not has_feats.any():
+            yield "\n".join(log_buf) + "\n\nNo feature index built yet — click Build Feature Index first.", []
+            return
+        # Weighted Euclidean distance
+        W = np.ones(FEAT_DIM, dtype=np.float32)
+        W[20]=5.0; W[17]=2.0; W[11]=1.5; W[28]=3.0; W[29]=4.0
+        diffs     = index_features - q_feats[np.newaxis, :]
+        feat_dist = np.sqrt((diffs**2 * W[np.newaxis,:]).sum(axis=1))
+        feat_dist[~has_feats] = np.inf
+        top200_idx = np.argsort(feat_dist)[:200]
+        for abs_i in top200_idx:
+            if feat_dist[abs_i] == np.inf: continue
+            scored.append((float(feat_dist[abs_i]), abs_i, float(feat_dist[abs_i])))
+        log_buf.append(f"\nSearch mode: Features Only  ({int(has_feats.sum())} images with features)")
+
+    else:
+        # ── FAISS CNN search ──────────────────────────────────────────────────
+        q_emb_f = np.ascontiguousarray(q_emb.reshape(1,-1), dtype=np.float32)
+        D, I    = faiss_idx.search(q_emb_f, 200)
+        top200_idx  = I[0]
+        top200_dist = np.sqrt(np.maximum(D[0], 0.0))
+
+        use_feats = (mode == "CNN + Features") and q_has_feats
+        for abs_i, embed_dist in zip(top200_idx, top200_dist):
+            if abs_i < 0: continue
+            embed_dist = float(embed_dist)
+            penalty    = 0.0
+            if use_feats:
+                c_feats = index_features[abs_i]
+                c_has   = not np.all(c_feats == 0)
+                if c_has:
+                    skin_diff  = abs(float(q_feats[20]) - float(c_feats[20]))
+                    hh         = abs(float(q_feats[17]) - float(c_feats[17]))
+                    hair_diff  = min(hh, 1.0 - hh)
+                    shape_diff = abs(float(q_feats[11]) - float(c_feats[11]))
+                    penalty    = 5.0*skin_diff + 2.0*hair_diff + shape_diff
+                    # age penalty (if both have age)
+                    if q_feats[28] > 0 and c_feats[28] > 0:
+                        penalty += 3.0 * abs(float(q_feats[28]) - float(c_feats[28]))
+                    # gender penalty
+                    if q_feats[29] > 0 and c_feats[29] > 0:
+                        penalty += 4.0 * abs(float(q_feats[29]) - float(c_feats[29]))
+                else:
+                    penalty = 0.30
+            scored.append((embed_dist + penalty, abs_i, embed_dist))
+
+        if mode == "CNN Only":
+            log_buf.append("\nSearch mode: CNN Only  (no feature re-ranking)")
+        elif use_feats:
+            log_buf.append("\nSearch mode: CNN + Features  "
+                           "(skin×5, hair×2, shape×1.5, age×3, gender×4)")
         else:
-            penalty = 0.0
-
-        scored.append((embed_dist + penalty, abs_i, embed_dist))
+            log_buf.append("\nSearch mode: CNN + Features  (OFF — no face detected)")
 
     scored.sort(key=lambda x: x[0])
-
-    reranked = q_has_feats
-    if reranked:
-        log_buf.append("\nFeature re-ranking: ON  "
-                       "(skin tone ×5, hair hue ×1.5, face shape ×1)")
-    else:
-        log_buf.append("\nFeature re-ranking: OFF  (no face landmarks on query)")
 
     gallery_items = []
     seen_names    = {}
@@ -918,6 +1009,21 @@ with gr.Blocks(title="Face Verification") as app:
             btn_stop.click(stop_training,   outputs=status_box)
             btn_refresh.click(get_log,      outputs=log_box)
 
+            gr.Markdown("---")
+            gr.Markdown(
+                "**VGGFace2** — 3.3M images across 9,131 celebrities, purpose-built for face recognition.  \n"
+                "Download once, then restart training — pairs are added automatically.  \n"
+                "*(Requires Kaggle API key in `~/.kaggle/kaggle.json`)*"
+            )
+            vgg_status_box = gr.Textbox(label="VGGFace2 Status",
+                                        value=_vgg_status(), lines=1, interactive=False)
+            btn_vgg = gr.Button("Download VGGFace2", variant="secondary")
+            vgg_log = gr.Textbox(label="Download Log", lines=5, interactive=False)
+
+            btn_vgg.click(download_vggface2, inputs=None,
+                          outputs=vgg_log, show_progress="hidden")
+            btn_vgg.click(lambda: _vgg_status(), outputs=vgg_status_box)
+
         # ── TAB 2: SCRAPE DATA ────────────────────────────────────────────────
         with gr.Tab("Scrape Data"):
             gr.Markdown(
@@ -955,7 +1061,12 @@ with gr.Blocks(title="Face Verification") as app:
                 "eye color, face shape, and whether they are active.  \n"
                 "*(First click builds an embedding index — ~1–2 min the first time.)*"
             )
-            img_in   = gr.Image(label="Upload Face", type="numpy")
+            img_in      = gr.Image(label="Upload Face", type="numpy")
+            search_mode = gr.Radio(
+                ["CNN + Features", "CNN Only", "Features Only"],
+                value="CNN + Features",
+                label="Search Mode",
+            )
             btn_id   = gr.Button("Find Matches", variant="primary")
             diag_box = gr.Textbox(label="Feature Diagnostic & Results Log",
                                   lines=20, interactive=False)
@@ -971,7 +1082,7 @@ with gr.Blocks(title="Face Verification") as app:
             btn_feat  = gr.Button("Build Feature Index", variant="secondary")
             feat_log  = gr.Textbox(label="Feature Index Log", lines=6, interactive=False)
 
-            btn_id.click(find_dataset_matches, inputs=img_in,
+            btn_id.click(find_dataset_matches, inputs=[img_in, search_mode],
                          outputs=[diag_box, gallery],
                          show_progress="hidden")
             btn_feat.click(build_feature_index, inputs=None,

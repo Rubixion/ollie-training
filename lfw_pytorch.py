@@ -277,6 +277,51 @@ def generate_pairs_from_filesystem(dataset_path, exclude_people, max_pos=3000):
     return all_positive + negative
 
 
+def generate_pairs_from_flat_dir(root, exclude_people, max_pos=50000):
+    """
+    Like generate_pairs_from_filesystem but for datasets where identity folders
+    sit directly under `root` (e.g. VGGFace2: root/n000001/, root/n000002/, ...).
+    Also accepts .png and .jpeg in addition to .jpg.
+    """
+    person_images = {}
+    for name in sorted(os.listdir(root)):
+        if name in exclude_people:
+            continue
+        folder = os.path.join(root, name)
+        if not os.path.isdir(folder):
+            continue
+        imgs = sorted(
+            os.path.join(folder, f)
+            for f in os.listdir(folder)
+            if f.lower().endswith(('.jpg', '.jpeg', '.png'))
+        )
+        if len(imgs) >= 2:
+            person_images[name] = imgs
+
+    print(f"  Found {len(person_images)} identities with ≥2 images (test people excluded)")
+
+    all_positive = []
+    for name, imgs in person_images.items():
+        combos = list(itertools.combinations(imgs, 2))
+        if len(combos) > 10:
+            combos = random.sample(combos, 10)
+        all_positive.extend((p1, p2, 1.0) for p1, p2 in combos)
+
+    random.shuffle(all_positive)
+    all_positive = all_positive[:max_pos]
+
+    all_imgs_flat = [(name, p) for name, imgs in person_images.items() for p in imgs]
+    negative = []
+    attempts = 0
+    while len(negative) < len(all_positive) and attempts < len(all_positive) * 20:
+        (n1, p1), (n2, p2) = random.sample(all_imgs_flat, 2)
+        if n1 != n2:
+            negative.append((p1, p2, 0.0))
+        attempts += 1
+
+    return all_positive + negative
+
+
 # ── training / evaluation ─────────────────────────────────────────────────────
 
 def run_epoch(model, loader, criterion, optimizer, training):
