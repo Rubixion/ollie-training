@@ -3,6 +3,8 @@ import { Outfit, JetBrains_Mono } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { AuthProvider } from "@/components/auth-provider"
+import { AuthModal } from "@/components/auth-modal"
 import { cn } from "@/lib/utils"
 
 const outfit = Outfit({
@@ -61,7 +63,10 @@ export default function RootLayout({
     >
       <body suppressHydrationWarning>
         <ThemeProvider defaultTheme="dark" enableSystem={false}>
-          {children}
+          <AuthProvider>
+            {children}
+            <AuthModal />
+          </AuthProvider>
         </ThemeProvider>
         <script
           type="application/ld+json"

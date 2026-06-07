@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, DragEvent, ChangeEvent } from "react"
 import { motion } from "framer-motion"
 import { Upload, X, Search, Loader2, AlertCircle, User } from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
 
 
 interface Match {
@@ -57,6 +58,7 @@ function parseGradioResponse(data: unknown): Match[] {
 }
 
 export function CelebrityFinder() {
+  const { user, openModal } = useAuth()
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const mode = "CNN + Features"
@@ -103,6 +105,10 @@ export function CelebrityFinder() {
 
   const handleSearch = async () => {
     if (!imageDataUrl) return
+    if (!user) {
+      openModal(() => handleSearch())
+      return
+    }
     setLoading(true)
     setError(null)
     setMatches(null)

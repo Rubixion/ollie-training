@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -7,6 +7,7 @@ import { Nav } from "@/components/nav"
 import { Footer } from "@/components/footer"
 import { DottedSurface } from "@/components/ui/dotted-surface"
 import { ParticleTextEffect } from "@/components/effects/particle-text"
+import { useAuth } from "@/components/auth-provider"
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -21,12 +22,13 @@ function Divider() {
 }
 
 export default function Page() {
+  const { user, openModal } = useAuth()
   return (
     <main className="relative bg-transparent overflow-hidden">
       <DottedSurface />
       <Nav />
 
-      {/* ── HERO ─────────────────────────────────────────────────────────── */}
+      {/* HERO */}
       <section className="relative flex flex-col items-center justify-center min-h-screen pt-16 px-6 text-center">
         <motion.div
           initial={{ opacity: 0, y: 32 }}
@@ -50,21 +52,39 @@ export default function Page() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 0.6 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+            className="flex flex-col items-center gap-4"
           >
-            <Link
-              href="/match"
-              className="group flex items-center gap-2 px-8 py-4 rounded-full bg-(--ollie-cyan) text-white font-bold text-sm hover:opacity-90 transition-all active:scale-[0.98]"
-            >
-              Find Your Lookalike
-              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <Link
-              href="/ai"
-              className="flex items-center gap-2 px-8 py-4 rounded-full border border-white/15 text-white/70 hover:text-white hover:border-white/30 font-semibold text-sm transition-all"
-            >
-              See How It Works
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link
+                href="/match"
+                className="group flex items-center gap-2 px-8 py-4 rounded-full bg-(--ollie-cyan) text-white font-bold text-sm hover:opacity-90 transition-all active:scale-[0.98]"
+              >
+                Find Your Lookalike
+                <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+              </Link>
+              <Link
+                href="/ai"
+                className="flex items-center gap-2 px-8 py-4 rounded-full border border-white/15 text-white/70 hover:text-white hover:border-white/30 font-semibold text-sm transition-all"
+              >
+                See How It Works
+              </Link>
+            </div>
+            {!user && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1.0, duration: 0.5 }}
+                className="text-white/20 text-xs"
+              >
+                <button
+                  onClick={() => openModal()}
+                  className="underline underline-offset-2 hover:text-white/40 transition-colors"
+                >
+                  Create a free account
+                </button>
+                {" "}to save your results
+              </motion.p>
+            )}
           </motion.div>
         </motion.div>
         <motion.div
@@ -82,11 +102,10 @@ export default function Page() {
         </motion.div>
       </section>
 
-      {/* ── CELEBRITY FINDER ─────────────────────────────────────────────── */}
+      {/* CELEBRITY FINDER */}
       <Divider />
       <section className="px-6 py-28 max-w-6xl mx-auto">
         <div className="flex flex-col lg:flex-row gap-16 items-center">
-          {/* Left: text */}
           <motion.div
             initial={{ opacity: 0, x: -32 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -102,8 +121,6 @@ export default function Page() {
               Upload any photo and our AI compares your face against thousands of celebrities.
               It analyses your facial structure, bone geometry, and features to find who you most resemble with surprising accuracy.
             </p>
-
-            {/* Steps */}
             <div className="flex flex-col gap-5 mb-10">
               {[
                 { icon: Upload, step: "01", label: "Upload your photo", desc: "Drag & drop or browse. Works with any clear face photo." },
@@ -124,7 +141,6 @@ export default function Page() {
                 </div>
               ))}
             </div>
-
             <Link
               href="/match"
               className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-(--ollie-cyan) text-white font-bold text-sm hover:opacity-90 transition-all"
@@ -133,8 +149,6 @@ export default function Page() {
               <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform" />
             </Link>
           </motion.div>
-
-          {/* Right: feature highlights */}
           <motion.div
             initial={{ opacity: 0, x: 32 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -160,7 +174,7 @@ export default function Page() {
         </div>
       </section>
 
-      {/* ── HOW THE AI WORKS ─────────────────────────────────────────────── */}
+      {/* HOW THE AI WORKS */}
       <Divider />
       <section className="px-6 py-28 max-w-6xl mx-auto">
         <motion.div
@@ -175,12 +189,10 @@ export default function Page() {
             Custom-built facial recognition
           </h2>
           <p className="text-white/45 text-base leading-relaxed max-w-2xl mx-auto">
-            Ollie isn&apos;t using off-the-shelf software. It&apos;s a neural network trained from scratch on millions of faces - 
+            Ollie isn&apos;t using off-the-shelf software. It&apos;s a neural network trained from scratch on millions of faces -
             learning what makes two faces similar and what makes them different.
           </p>
         </motion.div>
-
-        {/* Stats row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-14">
           {[
             { value: "83.5%", label: "Accuracy", sub: "on standard test set" },
@@ -202,8 +214,6 @@ export default function Page() {
             </motion.div>
           ))}
         </div>
-
-        {/* Brief explanation columns */}
         <div className="grid md:grid-cols-3 gap-6 mb-12">
           {[
             {
@@ -240,7 +250,6 @@ export default function Page() {
             </motion.div>
           ))}
         </div>
-
         <div className="text-center">
           <Link
             href="/ai"
@@ -252,7 +261,7 @@ export default function Page() {
         </div>
       </section>
 
-      {/* ── FIND PERSON ──────────────────────────────────────────────────── */}
+      {/* FIND PERSON */}
       <Divider />
       <section className="px-6 py-28 max-w-6xl mx-auto">
         <div className="flex flex-col lg:flex-row gap-16 items-center">
@@ -296,7 +305,7 @@ export default function Page() {
         </div>
       </section>
 
-      {/* ── FEEDBACK ─────────────────────────────────────────────────────── */}
+      {/* FEEDBACK */}
       <Divider />
       <section className="px-6 py-28 max-w-6xl mx-auto">
         <motion.div
@@ -315,9 +324,17 @@ export default function Page() {
               Every correction you submit gets fed directly into the next training run.
               Your feedback isn&apos;t just a rating. It becomes real training data that changes how the AI behaves.
             </p>
-            <p className="text-white/30 text-sm leading-relaxed">
+            <p className="text-white/30 text-sm leading-relaxed mb-6">
               This is collaborative AI training: the more people use and correct it, the better it gets for everyone.
             </p>
+            {!user && (
+              <button
+                onClick={() => openModal()}
+                className="text-white/25 text-xs underline underline-offset-2 hover:text-white/45 transition-colors"
+              >
+                Sign up to track your feedback history
+              </button>
+            )}
           </div>
           <div className="flex-1 flex flex-col gap-4">
             <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/8">
