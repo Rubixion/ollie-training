@@ -334,8 +334,8 @@ def _train_worker():
             batch_size=32, shuffle=False, num_workers=0)
 
         model     = SiameseNet(embedding_size=EMBEDDING_SIZE, dropout=0.25, feat_dim=FEAT_DIM).to(DEVICE)
-        optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=4, factor=0.5)
+        optimizer = optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-4)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=15, factor=0.5)
         start_epoch = 0
         best_acc    = 0.0
         threshold   = 0.5
