@@ -1,22 +1,19 @@
 'use client';
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
-type DottedSurfaceProps = Omit<React.ComponentProps<'div'>, 'ref'>;
+// Module-level state — persists across route changes
+let rendererInstance: THREE.WebGLRenderer | null = null;
+let animationId: number = 0;
+let count = 0;
+
+type DottedSurfaceProps = { className?: string };
 
 export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 	const { theme } = useTheme();
 	const containerRef = useRef<HTMLDivElement>(null);
-	const sceneRef = useRef<{
-		scene: THREE.Scene;
-		camera: THREE.PerspectiveCamera;
-		renderer: THREE.WebGLRenderer;
-		particles: THREE.Points[];
-		animationId: number;
-		count: number;
-	} | null>(null);
 
 	useEffect(() => {
 		if (!containerRef.current) return;
@@ -27,18 +24,24 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 		scene.fog = new THREE.Fog(0x000000, 2000, 8000);
 		const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000);
 		camera.position.set(0, 355, 1220);
-		const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+
+		// Reuse existing renderer if possible
+		if (!rendererInstance) {
+			rendererInstance = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+		}
+		const renderer = rendererInstance;
 		renderer.setPixelRatio(window.devicePixelRatio);
 		renderer.setSize(window.innerWidth, window.innerHeight);
-		renderer.setClearColor(scene.fog.color, 0);
+		renderer.setClearColor(0x000000, 0);
 		containerRef.current.appendChild(renderer.domElement);
+
 		const positions: number[] = [];
 		const colors: number[] = [];
 		const geometry = new THREE.BufferGeometry();
 		for (let ix = 0; ix < AMOUNTX; ix++) {
 			for (let iy = 0; iy < AMOUNTY; iy++) {
 				positions.push(ix * SEPARATION - (AMOUNTX * SEPARATION) / 2, 0, iy * SEPARATION - (AMOUNTY * SEPARATION) / 2);
-				if (theme === 'dark') { colors.push(0.392, 0.510, 0.824); } else { colors.push(0.15, 0.15, 0.15); }
+				colors.push(0.392, 0.510, 0.824);
 			}
 		}
 		geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -46,12 +49,14 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 		const material = new THREE.PointsMaterial({ size: 8, vertexColors: true, transparent: true, opacity: 0.6, sizeAttenuation: true });
 		const points = new THREE.Points(geometry, material);
 		scene.add(points);
-		let count = 0;
-		let animationId: number = 0;
+
 		let destroyed = false;
+		cancelAnimationFrame(animationId);
+
 		const animate = () => {
 			if (destroyed) return;
 			animationId = requestAnimationFrame(animate);
+			if (document.hidden) return;
 			const positionAttribute = geometry.attributes.position;
 			const pos = positionAttribute.array as Float32Array;
 			let i = 0;
@@ -65,46 +70,24 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 			renderer.render(scene, camera);
 			count += 0.1;
 		};
+
 		const handleResize = () => {
 			camera.aspect = window.innerWidth / window.innerHeight;
 			camera.updateProjectionMatrix();
 			renderer.setSize(window.innerWidth, window.innerHeight);
 		};
-		const handleVisibility = () => {
-			if (!document.hidden && !destroyed) {
-				cancelAnimationFrame(animationId);
-				animate();
-			}
-		};
-		const handleFocus = () => {
-			if (!destroyed) {
-				cancelAnimationFrame(animationId);
-				animate();
-			}
-		};
 		window.addEventListener('resize', handleResize);
-		document.addEventListener('visibilitychange', handleVisibility);
-		window.addEventListener('focus', handleFocus);
 		animate();
-		sceneRef.current = { scene, camera, renderer, particles: [points], animationId, count };
+
 		return () => {
 			destroyed = true;
+			cancelAnimationFrame(animationId);
 			window.removeEventListener('resize', handleResize);
-			document.removeEventListener('visibilitychange', handleVisibility);
-			window.removeEventListener('focus', handleFocus);
-			if (sceneRef.current) {
-				cancelAnimationFrame(animationId);
-				sceneRef.current.scene.traverse((object) => {
-					if (object instanceof THREE.Points) {
-						object.geometry.dispose();
-						if (Array.isArray(object.material)) { object.material.forEach((m) => m.dispose()); }
-						else { (object.material as THREE.Material).dispose(); }
-					}
-				});
-				sceneRef.current.renderer.dispose();
-				if (containerRef.current && sceneRef.current.renderer.domElement) {
-					containerRef.current.removeChild(sceneRef.current.renderer.domElement);
-				}
+			geometry.dispose();
+			material.dispose();
+			// Don't dispose the renderer — just detach it
+			if (containerRef.current && renderer.domElement.parentNode === containerRef.current) {
+				containerRef.current.removeChild(renderer.domElement);
 			}
 		};
 	}, [theme]);

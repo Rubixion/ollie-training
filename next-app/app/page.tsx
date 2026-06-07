@@ -143,11 +143,11 @@ export default function Page() {
             className="flex-1 grid grid-cols-2 gap-4"
           >
             {[
-              { label: "3 search modes", desc: "CNN + Features, CNN only, or geometric features only" },
+              { label: "Smart matching", desc: "CNN + facial geometry combined for the most accurate results" },
               { label: "Fast results", desc: "Your match appears in under 2 seconds" },
               { label: "No photo stored", desc: "Your image is never saved to any server" },
               { label: "Ranked by likeness", desc: "Each match shows a similarity percentage" },
-              { label: "100k+ celebrities", desc: "Compares your face to every celebrity you can think of." },
+              { label: "9,000+ celebrities", desc: "Matched against a curated dataset of well-known faces" },
               { label: "Improves over time", desc: "The AI learns from user feedback after each search" },
             ].map(({ label, desc }) => (
               <div key={label} className="p-5 rounded-2xl bg-white/[0.03] border border-white/8 flex flex-col gap-2">
