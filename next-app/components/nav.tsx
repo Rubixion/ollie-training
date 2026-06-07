@@ -8,10 +8,10 @@ import { usePathname } from "next/navigation"
 
 const links = [
   { label: "Celebrity Twins", href: "/match" },
-  { label: "How It Works", href: "/ai" },
   { label: "Face Search", href: "/search" },
+  { label: "How It Works", href: "/ai" },
   { label: "Feedback", href: "/feedback" },
-  { label: "Info", href: "/info" },
+  { label: "About", href: "/about" },
 ]
 
 export function Nav() {
@@ -50,6 +50,7 @@ export function Nav() {
               <li key={link.href}>
                 <Link
                   href={link.href}
+                  aria-current={isActive ? "page" : undefined}
                   className={`text-sm transition-colors ${
                     isActive
                       ? "text-white font-semibold"

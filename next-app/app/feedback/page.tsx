@@ -4,7 +4,7 @@ import { BGPattern } from "@/components/bg-pattern"
 import { FeedbackSection } from "@/components/feedback-section"
 
 export const metadata = {
-  title: "Feedback â€” Ollie",
+  title: "Feedback - Ollie",
   description: "Help train the Ollie model by correcting face match results.",
 }
 
@@ -20,3 +20,4 @@ export default function FeedbackPage() {
     </main>
   )
 }
+

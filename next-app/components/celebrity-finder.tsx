@@ -149,9 +149,9 @@ export function CelebrityFinder() {
           <span className="inline-block text-xs font-semibold tracking-widest text-(--ollie-cyan) uppercase mb-3">
             Core Feature
           </span>
-          <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight">
+          <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight">
             Find Your Celebrity Match
-          </h2>
+          </h1>
           <p className="mt-4 text-white/50 max-w-xl mx-auto">
             Drop your photo. See which celebrity you resemble.
           </p>

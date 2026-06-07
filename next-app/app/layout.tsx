@@ -17,9 +17,35 @@ const fontMono = JetBrains_Mono({
   weight: ["400", "500", "600"],
 })
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ollieai.app"
+
 export const metadata: Metadata = {
-  title: "Ollie - Find Your Celebrity Lookalike",
-  description: "AI-powered face recognition to find your celebrity twin.",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Ollie - Find Your Celebrity Lookalike",
+    template: "%s | Ollie",
+  },
+  description: "Upload your photo and discover which celebrity you most resemble. Free AI-powered celebrity face matching using deep learning and facial recognition technology.",
+  keywords: ["celebrity lookalike", "celebrity face match", "AI face recognition", "who do I look like", "celebrity twin finder", "facial recognition AI", "celebrity doppelganger"],
+  openGraph: {
+    type: "website",
+    siteName: "Ollie",
+    title: "Ollie - Find Your Celebrity Lookalike",
+    description: "Upload your photo and discover which celebrity you most resemble. Free AI-powered celebrity face matching.",
+    url: siteUrl,
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Ollie - Find Your Celebrity Lookalike",
+    description: "Upload your photo and discover which celebrity you most resemble. Free AI-powered celebrity face matching.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+  },
+  alternates: { canonical: siteUrl },
 }
 
 export default function RootLayout({
@@ -37,6 +63,38 @@ export default function RootLayout({
         <ThemeProvider defaultTheme="dark" enableSystem={false}>
           {children}
         </ThemeProvider>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              "name": "Ollie",
+              "url": siteUrl,
+              "description": "Ollie builds AI-powered facial recognition tools, starting with a celebrity face matching app backed by a custom neural network.",
+              "contactPoint": { "@type": "ContactPoint", "contactType": "customer support", "url": `${siteUrl}/contact` },
+              "knowsAbout": ["Facial recognition", "Deep learning", "Celebrity face matching", "Neural networks"],
+            }),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebApplication",
+              "name": "Ollie",
+              "url": siteUrl,
+              "description": "AI-powered celebrity face matching. Upload your photo and discover which celebrity you most resemble.",
+              "applicationCategory": "EntertainmentApplication",
+              "operatingSystem": "Web",
+              "browserRequirements": "Requires JavaScript",
+              "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+              "creator": { "@type": "Organization", "name": "Ollie", "url": siteUrl },
+              "featureList": ["Celebrity face matching", "AI facial recognition", "Siamese neural network", "Real-time results"],
+            }),
+          }}
+        />
       </body>
     </html>
   )

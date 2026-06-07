@@ -34,6 +34,7 @@ export default function Page() {
           transition={{ duration: 0.8 }}
           className="w-full max-w-4xl mx-auto"
         >
+          <h1 className="sr-only">Ollie - Find Your Celebrity Lookalike with AI Face Matching</h1>
           <div className="w-full mb-4">
             <ParticleTextEffect words={["OLLIE", "FIND YOUR TWIN", "FACE AI", "WHO ARE YOU?"]} />
           </div>
