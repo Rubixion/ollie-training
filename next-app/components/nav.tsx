@@ -1,10 +1,11 @@
-﻿"use client"
+"use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Menu, X } from "lucide-react"
+import { Menu, X, User, LogOut } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useAuth } from "@/components/auth-provider"
 
 const links = [
   { label: "Celebrity Twins", href: "/match" },
@@ -14,7 +15,72 @@ const links = [
   { label: "About", href: "/about" },
 ]
 
+function ProfileMenu() {
+  const { user, signOut, openModal } = useAuth()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  if (!user) {
+    return (
+      <button
+        onClick={() => openModal()}
+        className="hidden md:flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full border border-white/15 text-white/60 hover:text-white hover:border-white/30 transition-all"
+      >
+        <User size={14} />
+        Sign In
+      </button>
+    )
+  }
+
+  return (
+    <div ref={ref} className="hidden md:block relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-9 h-9 rounded-full border border-white/10 bg-white/[0.06] hover:bg-white/[0.10] hover:border-white/25 transition-all flex items-center justify-center"
+        aria-label="Account menu"
+      >
+        <User size={16} className="text-white/50" />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 6 }}
+            transition={{ type: "spring", bounce: 0.15, duration: 0.25 }}
+            className="absolute right-0 top-full mt-2 w-52 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl shadow-black overflow-hidden z-50"
+          >
+            <div className="px-4 py-3 border-b border-white/5">
+              <p className="text-white/25 text-[10px] uppercase tracking-widest mb-0.5">Signed in as</p>
+              <p className="text-white/70 text-xs truncate font-medium">{user.email}</p>
+            </div>
+            <div className="p-1.5">
+              <button
+                onClick={() => { signOut(); setOpen(false) }}
+                className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-red-400/70 hover:text-red-400 hover:bg-red-500/8 text-sm transition-all"
+              >
+                <LogOut size={14} />
+                Sign out
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 export function Nav() {
+  const { user, openModal, signOut } = useAuth()
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
@@ -64,13 +130,8 @@ export function Nav() {
           })}
         </ul>
 
-        {/* Desktop CTA */}
-        <Link
-          href="/match"
-          className="hidden md:block text-sm font-semibold px-4 py-2 rounded-full bg-(--ollie-cyan) text-white hover:opacity-90 transition-colors"
-        >
-          Try It Free
-        </Link>
+        {/* Desktop right: profile or sign in */}
+        <ProfileMenu />
 
         {/* Mobile hamburger */}
         <button
@@ -110,13 +171,26 @@ export function Nav() {
                 )
               })}
               <li className="pt-2">
-                <Link
-                  href="/match"
-                  onClick={() => setOpen(false)}
-                  className="block w-full text-center text-sm font-semibold py-3 rounded-full bg-(--ollie-cyan) text-white hover:opacity-90 transition-colors"
-                >
-                  Try It Free
-                </Link>
+                {user ? (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-white/25 text-xs px-1">{user.email}</p>
+                    <button
+                      onClick={() => { signOut(); setOpen(false) }}
+                      className="flex items-center gap-2 w-full text-sm font-semibold py-3 px-4 rounded-full border border-red-500/20 text-red-400/70 hover:text-red-400 transition-colors"
+                    >
+                      <LogOut size={14} />
+                      Sign out
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { openModal(); setOpen(false) }}
+                    className="flex items-center justify-center gap-2 w-full text-sm font-semibold py-3 rounded-full border border-white/15 text-white/70 hover:text-white transition-colors"
+                  >
+                    <User size={14} />
+                    Sign In / Create Account
+                  </button>
+                )}
               </li>
             </ul>
           </motion.div>
