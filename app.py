@@ -285,14 +285,14 @@ def _train_worker():
 
         log("Loading LFW train pairs...")
         official  = load_csv_pairs(dp, "matchpairsDevTrain.csv", "mismatchpairsDevTrain.csv")
-        generated = generate_pairs_from_filesystem(dp, exclude_people=test_people, max_pos=5000)
+        generated = generate_pairs_from_filesystem(dp, exclude_people=test_people, max_pos=8000)
 
         # VGGFace2 pairs (capped to avoid memory issues on small GPUs)
         vgg_root = _vgg_root()
         if vgg_root:
             log("Loading VGGFace2 pairs...")
             vgg_pairs = generate_pairs_from_flat_dir(
-                vgg_root, exclude_people=test_people, max_pos=50000)
+                vgg_root, exclude_people=test_people, max_pos=80000)
             log(f"  VGGFace2: {len(vgg_pairs)} pairs from {vgg_root}")
         else:
             vgg_pairs = []
@@ -334,8 +334,8 @@ def _train_worker():
             batch_size=32, shuffle=False, num_workers=0)
 
         model     = SiameseNet(embedding_size=EMBEDDING_SIZE, dropout=0.25, feat_dim=FEAT_DIM).to(DEVICE)
-        optimizer = optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-4)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=15, factor=0.5)
+        optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=300, eta_min=1e-6)
         start_epoch = 0
         best_acc    = 0.0
         threshold   = 0.5
@@ -367,7 +367,7 @@ def _train_worker():
         else:
             log("No checkpoint — starting fresh.\n")
 
-        for epoch in range(start_epoch, 200):
+        for epoch in range(start_epoch, 300):
             if _stop_event.is_set():
                 log("Stopped by user.")
                 break
@@ -420,7 +420,7 @@ def _train_worker():
 
             tr_acc = tr_correct / tr_total
             te_acc = best_thr_acc
-            scheduler.step(te_loss / te_total)
+            scheduler.step()
 
             if te_acc > best_acc:
                 best_acc = te_acc

@@ -70,12 +70,28 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 			camera.updateProjectionMatrix();
 			renderer.setSize(window.innerWidth, window.innerHeight);
 		};
+		const handleVisibility = () => {
+			if (!document.hidden && !destroyed) {
+				cancelAnimationFrame(animationId);
+				animate();
+			}
+		};
+		const handleFocus = () => {
+			if (!destroyed) {
+				cancelAnimationFrame(animationId);
+				animate();
+			}
+		};
 		window.addEventListener('resize', handleResize);
+		document.addEventListener('visibilitychange', handleVisibility);
+		window.addEventListener('focus', handleFocus);
 		animate();
 		sceneRef.current = { scene, camera, renderer, particles: [points], animationId, count };
 		return () => {
 			destroyed = true;
 			window.removeEventListener('resize', handleResize);
+			document.removeEventListener('visibilitychange', handleVisibility);
+			window.removeEventListener('focus', handleFocus);
 			if (sceneRef.current) {
 				cancelAnimationFrame(animationId);
 				sceneRef.current.scene.traverse((object) => {
