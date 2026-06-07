@@ -52,14 +52,14 @@ export default function Page() {
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
             <Link
-              href="/find"
+              href="/match"
               className="group flex items-center gap-2 px-8 py-4 rounded-full bg-(--ollie-cyan) text-white font-bold text-sm hover:opacity-90 transition-all active:scale-[0.98]"
             >
               Find Your Lookalike
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link
-              href="/neural"
+              href="/ai"
               className="flex items-center gap-2 px-8 py-4 rounded-full border border-white/15 text-white/70 hover:text-white hover:border-white/30 font-semibold text-sm transition-all"
             >
               See How It Works
@@ -93,21 +93,21 @@ export default function Page() {
             transition={{ duration: 0.7 }}
             className="flex-1"
           >
-            <SectionLabel>Celebrity Finder</SectionLabel>
+            <SectionLabel>Celebrity Twins</SectionLabel>
             <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight mb-6">
               Which celebrity<br />do you look like?
             </h2>
             <p className="text-white/50 text-base leading-relaxed mb-8">
               Upload any photo and our AI compares your face against thousands of celebrities.
-              It analyses your facial structure, bone geometry, and features to find who you most resemble - often with surprising accuracy.
+              It analyses your facial structure, bone geometry, and features to find who you most resemble with surprising accuracy.
             </p>
 
             {/* Steps */}
             <div className="flex flex-col gap-5 mb-10">
               {[
                 { icon: Upload, step: "01", label: "Upload your photo", desc: "Drag & drop or browse. Works with any clear face photo." },
-                { icon: Search, step: "02", label: "AI scans your face", desc: "256-dimensional face fingerprint created in under a second." },
-                { icon: Star, step: "03", label: "See your matches", desc: "Top 5 celebrity matches ranked by similarity percentage." },
+                { icon: Search, step: "02", label: "AI scans your face", desc: "Ollie creates a facial fingerprint in under a second." },
+                { icon: Star, step: "03", label: "See your matches", desc: "Top celebrity matches are ranked by similarity percentage." },
               ].map(({ icon: Icon, step, label, desc }) => (
                 <div key={step} className="flex gap-4 items-start">
                   <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
@@ -125,7 +125,7 @@ export default function Page() {
             </div>
 
             <Link
-              href="/find"
+              href="/match"
               className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-(--ollie-cyan) text-white font-bold text-sm hover:opacity-90 transition-all"
             >
               Try it now
@@ -146,7 +146,7 @@ export default function Page() {
               { label: "Fast results", desc: "Your match appears in under 2 seconds" },
               { label: "No photo stored", desc: "Your image is never saved to any server" },
               { label: "Ranked by likeness", desc: "Each match shows a similarity percentage" },
-              { label: "9,131 celebrities", desc: "Drawn from VGGFace2 and LFW datasets" },
+              { label: "100k+ celebrities", desc: "Compares your face to every celebrity you can think of." },
               { label: "Improves over time", desc: "The AI learns from user feedback after each search" },
             ].map(({ label, desc }) => (
               <div key={label} className="p-5 rounded-2xl bg-white/[0.03] border border-white/8 flex flex-col gap-2">
@@ -171,10 +171,10 @@ export default function Page() {
         >
           <SectionLabel>The AI</SectionLabel>
           <h2 className="text-4xl md:text-5xl font-black text-white/80 tracking-tight mb-5">
-            Custom-built face recognition
+            Custom-built facial recognition
           </h2>
           <p className="text-white/45 text-base leading-relaxed max-w-2xl mx-auto">
-            Ollie isn&apos;t using off-the-shelf software. It&apos;s a neural network trained from scratch on millions of face pairs -
+            Ollie isn&apos;t using off-the-shelf software. It&apos;s a neural network trained from scratch on millions of faces - 
             learning what makes two faces similar and what makes them different.
           </p>
         </motion.div>
@@ -208,7 +208,7 @@ export default function Page() {
             {
               icon: Brain,
               title: "It learns like a brain",
-              desc: "The network sees millions of face pairs - same person and different people - and slowly figures out what makes faces unique. No rules written by hand.",
+              desc: "The network sees millions of face pairs and slowly figures out what makes faces unique. No rules written by hand.",
             },
             {
               icon: Zap,
@@ -242,7 +242,7 @@ export default function Page() {
 
         <div className="text-center">
           <Link
-            href="/neural"
+            href="/ai"
             className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-full border border-white/15 text-white/70 hover:text-white hover:border-white/30 font-semibold text-sm transition-all"
           >
             Deep dive into the architecture
@@ -278,7 +278,7 @@ export default function Page() {
             className="flex-1 order-1 lg:order-2"
           >
             <div className="flex items-center gap-3 mb-4">
-              <SectionLabel>Find Person</SectionLabel>
+              <span className="inline-block text-xs font-bold tracking-widest uppercase text-white/40">Face Search</span>
               <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-white/10 text-white/40 border border-white/10 tracking-widest uppercase">Coming Soon</span>
             </div>
             <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight mb-6">
@@ -311,7 +311,7 @@ export default function Page() {
               Help make<br />Ollie smarter
             </h2>
             <p className="text-white/50 text-base leading-relaxed mb-4">
-              Every correction you submit - marking a match as wrong or right - gets fed directly into the next training run.
+              Every correction you submit gets fed directly into the next training run.
               Your feedback isn&apos;t just a rating. It becomes real training data that changes how the AI behaves.
             </p>
             <p className="text-white/30 text-sm leading-relaxed">

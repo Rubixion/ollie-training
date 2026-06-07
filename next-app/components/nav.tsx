@@ -7,9 +7,9 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 const links = [
-  { label: "Find Celebrity", href: "/find" },
-  { label: "How It Works", href: "/neural" },
-  { label: "Find Person", href: "/find-person" },
+  { label: "Celebrity Twins", href: "/match" },
+  { label: "How It Works", href: "/ai" },
+  { label: "Face Search", href: "/search" },
   { label: "Feedback", href: "/feedback" },
   { label: "Info", href: "/info" },
 ]
@@ -65,7 +65,7 @@ export function Nav() {
 
         {/* Desktop CTA */}
         <Link
-          href="/find"
+          href="/match"
           className="hidden md:block text-sm font-semibold px-4 py-2 rounded-full bg-(--ollie-cyan) text-white hover:opacity-90 transition-colors"
         >
           Try It Free
@@ -110,7 +110,7 @@ export function Nav() {
               })}
               <li className="pt-2">
                 <Link
-                  href="/find"
+                  href="/match"
                   onClick={() => setOpen(false)}
                   className="block w-full text-center text-sm font-semibold py-3 rounded-full bg-(--ollie-cyan) text-white hover:opacity-90 transition-colors"
                 >

@@ -29,7 +29,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "CAN I SEARCH THE INTERNET?",
-    a: "Not yet. Internet search is in development under 'Find Person' â€” check back soon.",
+    a: "Not yet. Internet search is in development under 'Face Search' â€” check back soon.",
   },
   {
     q: "HOW DO I HELP IMPROVE IT?",
@@ -135,7 +135,6 @@ function HelpFaqTab() {
   return (
     <div>
       <div className="text-center mb-10">
-        <div className="text-5xl mb-6 select-none" role="img" aria-label="gamepad">ðŸŽ®</div>
         <h2 className="retro text-xl md:text-2xl text-white mb-3">HELP CENTER</h2>
         <p className="retro text-(--ollie-cyan) text-[10px] tracking-widest">PRESS START TO GET ANSWERS</p>
       </div>
@@ -215,7 +214,6 @@ function AboutTab() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="text-center mb-12">
-        <div className="text-5xl mb-6 select-none" role="img" aria-label="brain">ðŸ§ </div>
         <h2 className="retro text-lg md:text-xl text-white mb-3">ABOUT OLLIE</h2>
         <p className="retro text-[10px] text-white/30 tracking-widest">OPEN SOURCE FACE RECOGNITION</p>
       </div>
@@ -256,7 +254,7 @@ function AboutTab() {
 
         <div className="flex justify-center">
           <Link
-            href="/neural"
+            href="/ai"
             className="group flex items-center gap-2 px-6 py-3 rounded-full bg-(--ollie-cyan)/10 border border-(--ollie-cyan)/30 text-(--ollie-cyan) text-sm font-semibold hover:bg-(--ollie-cyan)/20 transition-all"
           >
             Explore the Neural Architecture

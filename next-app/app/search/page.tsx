@@ -4,7 +4,7 @@ import { BGPattern } from "@/components/bg-pattern"
 import { FindPerson } from "@/components/find-person"
 
 export const metadata = {
-  title: "Find Person â€” Ollie",
+  title: "Face Search Ollie",
   description: "Internet-scale face search. Coming soon.",
 }
 

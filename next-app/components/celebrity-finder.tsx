@@ -4,7 +4,6 @@ import { useState, useRef, useCallback, DragEvent, ChangeEvent } from "react"
 import { motion } from "framer-motion"
 import { Upload, X, Search, Loader2, AlertCircle, User } from "lucide-react"
 
-type SearchMode = "CNN + Features" | "CNN Only" | "Features Only"
 
 interface Match {
   name: string
@@ -60,7 +59,7 @@ function parseGradioResponse(data: unknown): Match[] {
 export function CelebrityFinder() {
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [mode, setMode] = useState<SearchMode>("CNN + Features")
+  const mode = "CNN + Features"
   const [loading, setLoading] = useState(false)
   const [matches, setMatches] = useState<Match[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -135,7 +134,6 @@ export function CelebrityFinder() {
     }
   }
 
-  const modes: SearchMode[] = ["CNN + Features", "CNN Only", "Features Only"]
 
   return (
     <section id="finder" className="py-24 md:py-32 px-6 border-t border-white/5">
@@ -155,7 +153,7 @@ export function CelebrityFinder() {
             Find Your Celebrity Match
           </h2>
           <p className="mt-4 text-white/50 max-w-xl mx-auto">
-            Drop your photo. Choose a search mode. See which celebrity you resemble.
+            Drop your photo. See which celebrity you resemble.
           </p>
         </motion.div>
 
@@ -220,25 +218,6 @@ export function CelebrityFinder() {
               />
             </div>
 
-            {/* Mode selector */}
-            <div>
-              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-3">Search Mode</p>
-              <div className="flex gap-2">
-                {modes.map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setMode(m)}
-                    className={`flex-1 py-2 px-2 text-xs font-semibold rounded-xl border transition-all ${
-                      mode === m
-                        ? "border-(--ollie-cyan) bg-(--ollie-cyan)/10 text-(--ollie-cyan)"
-                        : "border-white/10 bg-white/[0.02] text-white/40 hover:border-white/20 hover:text-white/60"
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            </div>
 
             {/* Search button */}
             <button

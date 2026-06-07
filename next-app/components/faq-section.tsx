@@ -23,7 +23,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "CAN I SEARCH THE INTERNET?",
-    a: "Not yet. Internet search is in development under 'Find Person' â€” check back soon.",
+    a: "Not yet. Internet search is in development under 'Face Search' â€” check back soon.",
   },
   {
     q: "HOW DO I HELP IMPROVE IT?",
@@ -104,11 +104,6 @@ export function FaqSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          {/* Pixel character */}
-          <div className="text-5xl mb-6 select-none" role="img" aria-label="gamepad">
-            ðŸŽ®
-          </div>
-
           <h2 className="retro text-xl md:text-2xl text-white mb-3">HELP CENTER</h2>
           <p className="retro text-(--ollie-cyan) text-[10px] tracking-widest">
             PRESS START TO GET ANSWERS
