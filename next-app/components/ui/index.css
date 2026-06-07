@@ -137,7 +137,7 @@
   image-rendering: crisp-edges;
 }
 
-/* Marketplace appends ?theme=light; 8bit is dark-by-design — backstop tokens. */
+/* Marketplace appends ?theme=light; 8bit is dark-by-design - backstop tokens. */
 html.light, html:not(.dark) {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

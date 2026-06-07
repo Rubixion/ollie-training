@@ -76,7 +76,7 @@ function ArchitectureScroll() {
         <div className="flex flex-col lg:flex-row gap-12 items-start">
           <div className="flex-1">
             <p className="text-white/60 text-base leading-relaxed mb-6">
-              A neural network is software that learns by looking at examples — a lot of examples.
+              A neural network is software that learns by looking at examples - a lot of examples.
               You don&apos;t write rules for it. You show it thousands of pictures of cats and dogs and it figures out,
               on its own, what makes a cat look like a cat.
             </p>
@@ -88,11 +88,11 @@ function ArchitectureScroll() {
             <Callout>
               Think of it like a chain of workers on a production line. Worker 1 looks for edges.
               Worker 2 looks for shapes made of those edges. Worker 3 looks for faces made of those shapes.
-              No worker needed to be taught what a face is — they each learned their job just from seeing examples.
+              No worker needed to be taught what a face is - they each learned their job just from seeing examples.
             </Callout>
             <p className="text-white/60 text-base leading-relaxed">
               Ollie&apos;s network has 8 of these layers, called <strong className="text-white/85">residual blocks</strong>.
-              The &quot;residual&quot; part means each block also passes its raw input straight through to the next block —
+              The &quot;residual&quot; part means each block also passes its raw input straight through to the next block -
               this stops the network from forgetting what it learned in earlier layers as it gets deeper.
             </p>
           </div>
@@ -110,19 +110,19 @@ function ArchitectureScroll() {
       {/* ── 02  Why CNN? ────────────────────────────────────────────────── */}
       <Section id="s-siamese" num="02" title="Why does it need to see faces specifically?">
         <p className="text-white/60 text-base leading-relaxed mb-6">
-          A standard neural network trained on random images — cars, chairs, animals — is useless for faces.
+          A standard neural network trained on random images - cars, chairs, animals - is useless for faces.
           It doesn&apos;t know that the distance between your eyes matters, or that your jaw shape is distinctive.
-          Ollie&apos;s network was trained from scratch using only face pairs — it never saw anything else.
+          Ollie&apos;s network was trained from scratch using only face pairs - it never saw anything else.
         </p>
         <p className="text-white/60 text-base leading-relaxed mb-6">
-          The type of network used here is called a <strong className="text-white/85">CNN</strong> — Convolutional Neural Network.
+          The type of network used here is called a <strong className="text-white/85">CNN</strong> - Convolutional Neural Network.
           Instead of looking at every pixel at once, it slides a small window across the image and looks for patterns
           in small regions. This is exactly how we notice that someone has a strong jaw or wide-set eyes.
         </p>
 
         <div className="grid md:grid-cols-3 gap-4 mb-8">
           {[
-            { step: "Input", desc: "Your photo — just pixels, 96×96" },
+            { step: "Input", desc: "Your photo - just pixels, 96×96" },
             { step: "Early layers", desc: "Find edges, colour changes, basic shapes" },
             { step: "Deep layers", desc: "Find eyes, noses, jaw shapes" },
           ].map(({ step, desc }) => (
@@ -139,7 +139,7 @@ function ArchitectureScroll() {
           Every face gets one. Faces that look similar end up with fingerprints that are mathematically close together.
         </p>
         <Callout>
-          The number 256 isn&apos;t special — it&apos;s just enough dimensions to capture the complexity of a face
+          The number 256 isn&apos;t special - it&apos;s just enough dimensions to capture the complexity of a face
           without wasting memory. More dimensions = more detail, but also more to compute and more risk of memorising
           training data instead of learning general patterns.
         </Callout>
@@ -154,7 +154,7 @@ function ArchitectureScroll() {
         </p>
         <p className="text-white/60 text-base leading-relaxed mb-6">
           To do this, Ollie uses a <strong className="text-white/85">Siamese network</strong>.
-          Imagine twins sitting side by side — each one looking at a different photo, using the exact same brain.
+          Imagine twins sitting side by side - each one looking at a different photo, using the exact same brain.
           They each produce a fingerprint. Then a judge looks at how different those fingerprints are.
         </p>
 
@@ -178,7 +178,7 @@ function ArchitectureScroll() {
         <p className="text-white/60 text-base leading-relaxed mb-6">
           The thing that teaches the network to do this is called the <strong className="text-white/85">loss function</strong>.
           Think of it as a score that tells the network how badly it did. If it put two same-person fingerprints far apart,
-          or two different-person fingerprints close together — it gets penalised.
+          or two different-person fingerprints close together - it gets penalised.
           Over millions of tries, it learns to stop making those mistakes.
         </p>
         <Callout>
@@ -192,7 +192,7 @@ function ArchitectureScroll() {
       <Section id="s-features" num="04" title="What does it actually measure on your face?">
         <p className="text-white/60 text-base leading-relaxed mb-6">
           On top of the 256-number fingerprint from the neural network, Ollie also takes 32 direct physical
-          measurements from your face. These are things a doctor or forensic artist might measure — not things
+          measurements from your face. These are things a doctor or forensic artist might measure - not things
           a neural network invented.
         </p>
         <p className="text-white/60 text-base leading-relaxed mb-6">
@@ -210,12 +210,12 @@ function ArchitectureScroll() {
           <div className="px-5 pb-2">
             <FeatureRow index="0" name="eye_dist" plain="How far apart your eyes are, relative to your face width" />
             <FeatureRow index="1–2" name="ear_L / ear_R" plain="How open each eye is (eye aspect ratio)" />
-            <FeatureRow index="3–9" name="iris_*" plain="Colour and texture of each iris — hue, saturation, variance" />
-            <FeatureRow index="9" name="face_ratio" plain="Face height ÷ face width — are you more oval or round?" />
+            <FeatureRow index="3–9" name="iris_*" plain="Colour and texture of each iris - hue, saturation, variance" />
+            <FeatureRow index="9" name="face_ratio" plain="Face height ÷ face width - are you more oval or round?" />
             <FeatureRow index="10" name="jaw_w" plain="How wide your jaw is relative to your face" />
             <FeatureRow index="12–13" name="nose_w / nose_h" plain="Width and height of your nose relative to your face" />
             <FeatureRow index="14–16" name="lip_*" plain="Width, height, and openness of your mouth" />
-            <FeatureRow index="17–19" name="hair_H/S/V" plain="Colour of your hair — hue, saturation, brightness" />
+            <FeatureRow index="17–19" name="hair_H/S/V" plain="Colour of your hair - hue, saturation, brightness" />
             <FeatureRow index="20–22" name="skin_L/a/b" plain="Skin tone in a colour system that matches how humans perceive colour" />
             <FeatureRow index="23–26" name="*_ratio" plain="Proportions between forehead, eyes, nose, mouth, and chin" />
             <FeatureRow index="28" name="age_norm" plain="Estimated age (0–100 scaled to 0–1)" />
@@ -235,7 +235,7 @@ function ArchitectureScroll() {
         <p className="text-white/60 text-base leading-relaxed mb-6">
           Finding the closest fingerprint out of 17,000+ celebrities could take a long time if you checked every single one.
           Ollie uses a tool called <strong className="text-white/85">FAISS</strong> (built by Meta) to do this search
-          almost instantly — in about 10 milliseconds.
+          almost instantly - in about 10 milliseconds.
         </p>
         <p className="text-white/60 text-base leading-relaxed mb-6">
           FAISS stores all the celebrity fingerprints in a way that makes comparison very efficient.
@@ -263,7 +263,7 @@ function ArchitectureScroll() {
         </div>
 
         <Callout>
-          The similarity percentage you see isn&apos;t a raw score — it&apos;s been converted from the fingerprint distance
+          The similarity percentage you see isn&apos;t a raw score - it&apos;s been converted from the fingerprint distance
           into something readable. A 95% match means the fingerprints are very close together in that 256-dimensional space.
           A 60% match means they&apos;re noticeable further apart, but still in the same neighbourhood.
         </Callout>
@@ -272,11 +272,11 @@ function ArchitectureScroll() {
       {/* ── 06  Feedback loop ──────────────────────────────────────────── */}
       <Section id="s-feedback" num="06" title="How does it get better over time?">
         <p className="text-white/60 text-base leading-relaxed mb-6">
-          Every AI system makes mistakes. What makes Ollie different is that it learns from its mistakes in real time —
+          Every AI system makes mistakes. What makes Ollie different is that it learns from its mistakes in real time -
           because you can tell it when it got something wrong.
         </p>
         <p className="text-white/60 text-base leading-relaxed mb-6">
-          When you mark a match as wrong, that specific face pair — your photo and the wrong celebrity — gets stored
+          When you mark a match as wrong, that specific face pair - your photo and the wrong celebrity - gets stored
           as a &quot;this should be far apart&quot; example. When Ollie is retrained, it sees that example and adjusts
           so it never makes the same mistake on a face like that again.
         </p>
@@ -296,7 +296,7 @@ function ArchitectureScroll() {
             <div className="text-white font-bold text-sm mb-3">This isn&apos;t just a rating system</div>
             <p className="text-white/40 text-sm leading-relaxed">
               Most apps collect feedback and do nothing with it. Here, your correction is treated exactly the same
-              as a labelled training example from a professional dataset. It goes directly into the next training run —
+              as a labelled training example from a professional dataset. It goes directly into the next training run -
               no human review, no filtering.
             </p>
           </div>
@@ -320,7 +320,7 @@ function ArchitectureScroll() {
           showing the network millions of examples and gradually improving its answers each time.
         </p>
         <p className="text-white/60 text-base leading-relaxed mb-6">
-          Ollie was trained on a consumer gaming GPU — a GTX 1650 with 4GB of memory. Not a supercomputer.
+          Ollie was trained on a consumer gaming GPU - a GTX 1650 with 4GB of memory. Not a supercomputer.
           The best result so far is <strong className="text-white/85">83.5% accuracy</strong> on a standard face-matching test,
           reached after 90 rounds of training. It&apos;s still improving.
         </p>
@@ -359,9 +359,9 @@ export default function NeuralPage() {
 
       {/* Hero */}
       <section className="relative min-h-[40vh] flex flex-col items-center justify-center pt-24 pb-12 px-6 text-center">
-        <div className="w-full max-w-5xl mx-auto mb-6">
+        <div className="w-full max-w-7xl mx-auto mb-6">
           <ParticleTextEffect
-            words={["HOW IT WORKS", "THE AI EXPLAINED", "FACE FINGERPRINTS", "NEURAL NETWORKS", "FROM PIXELS TO MATCH"]}
+            words={["HOW IT WORKS", "THE AI EXPLAINED", "FACIAL FINGERPRINTS", "NEURAL NETWORKS", "PIXELS TO MATCH"]}
           />
         </div>
         <motion.p

@@ -258,7 +258,7 @@ export function NeuralViz() {
   }, [])
 
   const layerLabels = [
-    { label: "Input Face", sub: "224Ã—224 px" },
+    { label: "Input Face", sub: "224×224 px" },
     { label: "Conv Layers", sub: "Feature maps" },
     { label: "Dense Layer", sub: "512-dim" },
     { label: "Embedding", sub: "128-dim" },

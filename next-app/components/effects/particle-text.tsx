@@ -96,7 +96,7 @@ export function ParticleTextEffect({ words = ["OLLIE"] }: ParticleTextEffectProp
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return
-    canvas.width = 1400; canvas.height = 280
+    canvas.width = 2000; canvas.height = 300
     nextWord(words[0], canvas)
     const animate = () => {
       const ctx = canvas.getContext("2d")!; const particles = particlesRef.current

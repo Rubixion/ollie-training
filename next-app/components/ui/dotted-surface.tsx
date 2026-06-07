@@ -48,7 +48,9 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 		scene.add(points);
 		let count = 0;
 		let animationId: number = 0;
+		let destroyed = false;
 		const animate = () => {
+			if (destroyed) return;
 			animationId = requestAnimationFrame(animate);
 			const positionAttribute = geometry.attributes.position;
 			const pos = positionAttribute.array as Float32Array;
@@ -72,9 +74,10 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 		animate();
 		sceneRef.current = { scene, camera, renderer, particles: [points], animationId, count };
 		return () => {
+			destroyed = true;
 			window.removeEventListener('resize', handleResize);
 			if (sceneRef.current) {
-				cancelAnimationFrame(sceneRef.current.animationId);
+				cancelAnimationFrame(animationId);
 				sceneRef.current.scene.traverse((object) => {
 					if (object instanceof THREE.Points) {
 						object.geometry.dispose();

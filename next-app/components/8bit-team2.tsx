@@ -28,20 +28,20 @@ interface Team2Props {
 const defaultEntries: ChangelogEntry[] = [
   {
     date: "Mar 2026",
-    title: "v2.0 — Block System",
+    title: "v2.0 - Block System",
     description:
       "21 production-ready blocks across 8 categories. Hero, pricing, FAQ, social proof, and more.",
     badge: "LATEST",
   },
   {
     date: "Feb 2026",
-    title: "v1.5 — Gaming Components",
+    title: "v1.5 - Gaming Components",
     description:
       "Health bars, mana bars, leaderboards, game over screens, and victory animations.",
   },
   {
     date: "Jan 2026",
-    title: "v1.0 — Public Launch",
+    title: "v1.0 - Public Launch",
     description:
       "50+ base components. Registry goes live. Open source from day one.",
   },

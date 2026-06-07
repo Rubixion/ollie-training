@@ -18,7 +18,7 @@ const fontMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Ollie — Find Your Celebrity Lookalike",
+  title: "Ollie - Find Your Celebrity Lookalike",
   description: "AI-powered face recognition to find your celebrity twin.",
 }
 

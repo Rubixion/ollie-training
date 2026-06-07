@@ -99,7 +99,7 @@ export default function Page() {
             </h2>
             <p className="text-white/50 text-base leading-relaxed mb-8">
               Upload any photo and our AI compares your face against thousands of celebrities.
-              It analyses your facial structure, bone geometry, and features to find who you most resemble — often with surprising accuracy.
+              It analyses your facial structure, bone geometry, and features to find who you most resemble - often with surprising accuracy.
             </p>
 
             {/* Steps */}
@@ -174,7 +174,7 @@ export default function Page() {
             Custom-built face recognition
           </h2>
           <p className="text-white/45 text-base leading-relaxed max-w-2xl mx-auto">
-            Ollie isn&apos;t using off-the-shelf software. It&apos;s a neural network trained from scratch on millions of face pairs —
+            Ollie isn&apos;t using off-the-shelf software. It&apos;s a neural network trained from scratch on millions of face pairs -
             learning what makes two faces similar and what makes them different.
           </p>
         </motion.div>
@@ -208,7 +208,7 @@ export default function Page() {
             {
               icon: Brain,
               title: "It learns like a brain",
-              desc: "The network sees millions of face pairs — same person and different people — and slowly figures out what makes faces unique. No rules written by hand.",
+              desc: "The network sees millions of face pairs - same person and different people - and slowly figures out what makes faces unique. No rules written by hand.",
             },
             {
               icon: Zap,
@@ -289,7 +289,7 @@ export default function Page() {
               This feature is in active development.
             </p>
             <p className="text-white/30 text-sm leading-relaxed">
-              We&apos;re building this carefully — with privacy controls built in from the start, not added as an afterthought.
+              We&apos;re building this carefully - with privacy controls built in from the start, not added as an afterthought.
             </p>
           </motion.div>
         </div>
@@ -311,7 +311,7 @@ export default function Page() {
               Help make<br />Ollie smarter
             </h2>
             <p className="text-white/50 text-base leading-relaxed mb-4">
-              Every correction you submit — marking a match as wrong or right — gets fed directly into the next training run.
+              Every correction you submit - marking a match as wrong or right - gets fed directly into the next training run.
               Your feedback isn&apos;t just a rating. It becomes real training data that changes how the AI behaves.
             </p>
             <p className="text-white/30 text-sm leading-relaxed">

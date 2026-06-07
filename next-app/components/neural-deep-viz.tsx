@@ -19,7 +19,7 @@ interface LayerDef {
 const TOP_LAYERS: LayerDef[] = [
   {
     x: -6, count: 1, label: "Your photo",
-    simple: "This is your photo — just a grid of colour numbers that the AI reads one small region at a time.",
+    simple: "This is your photo - just a grid of colour numbers that the AI reads one small region at a time.",
     detail: "96x96x3 RGB tensor, pixel values normalised to [-1,1]. Input shape: [1, 3, 96, 96]. Each pixel is a float32 triple.",
     sectionId: "s-backbone", isInput: true,
   },
@@ -31,31 +31,31 @@ const TOP_LAYERS: LayerDef[] = [
   },
   {
     x: -2, count: 4, label: "Shape finder",
-    simple: "A deeper layer that starts assembling edges into shapes — eye corners, nose bridges, jaw lines.",
+    simple: "A deeper layer that starts assembling edges into shapes - eye corners, nose bridges, jaw lines.",
     detail: "ResBlock(64→128, stride=2) with 1x1 projection shortcut. Skip connection prevents vanishing gradients. Output: [1, 128, 48, 48].",
     sectionId: "s-backbone",
   },
   {
     x: 0, count: 6, label: "Feature mapper",
-    simple: "By here the network notices whole facial regions — eye spacing, nose width, forehead height.",
+    simple: "By here the network notices whole facial regions - eye spacing, nose width, forehead height.",
     detail: "ResBlock(128→256, stride=2). Receptive field ~40px of original image. Mid-level facial structure. Output: [1, 256, 24, 24].",
     sectionId: "s-backbone",
   },
   {
     x: 2, count: 6, label: "Identity layer",
-    simple: "The deepest layer — it now picks up high-level traits unique to one person, not just any face.",
+    simple: "The deepest layer - it now picks up high-level traits unique to one person, not just any face.",
     detail: "ResBlock(256→512, stride=2). Receptive field ~80px. High-level identity features emerge. Output: [1, 512, 12, 12].",
     sectionId: "s-backbone",
   },
   {
     x: 4, count: 3, label: "Summariser",
-    simple: "Compresses everything into a single flat summary — like turning a detailed report into one line.",
+    simple: "Compresses everything into a single flat summary - like turning a detailed report into one line.",
     detail: "Adaptive average pool 12x12 → 1x1. Spatial translation invariance. Output: [1, 512]. No learned parameters.",
     sectionId: "s-backbone",
   },
   {
     x: 6, count: 2, label: "Face fingerprint",
-    simple: "Your face is now 256 numbers. This is your unique fingerprint — similar faces land close together.",
+    simple: "Your face is now 256 numbers. This is your unique fingerprint - similar faces land close together.",
     detail: "Linear(512→256) + L2 normalisation. Projects onto unit hypersphere in R^256. ||e||_2 = 1.0 by construction. Cosine distance is equivalent to half squared L2.",
     sectionId: "s-siamese",
   },
@@ -65,18 +65,18 @@ const BOTTOM_LAYERS: LayerDef[] = [
   {
     x: -6, count: 1, label: "Celebrity photo",
     simple: "A celebrity photo runs through an identical copy of the same network at the same time.",
-    detail: "Second face — Siamese twin input. Same preprocessing pipeline. All weights W and biases b are shared with the top network.",
+    detail: "Second face - Siamese twin input. Same preprocessing pipeline. All weights W and biases b are shared with the top network.",
     sectionId: "s-siamese", isInput: true,
   },
   {
     x: -4, count: 4, label: "Edge detector",
-    simple: "Same first step — scanning for edges using the same patterns the network already learned.",
+    simple: "Same first step - scanning for edges using the same patterns the network already learned.",
     detail: "Exact same Conv2d weights as the top network. Weight sharing is the defining property of a Siamese architecture.",
     sectionId: "s-siamese",
   },
   {
     x: -2, count: 4, label: "Shape finder",
-    simple: "Same layer, same learned rules — both faces are measured using identical criteria.",
+    simple: "Same layer, same learned rules - both faces are measured using identical criteria.",
     detail: "Same ResBlock(64→128) weights. Ensures both embeddings live in the same geometric space. Any transformation applied to face 1 applies equally to face 2.",
     sectionId: "s-siamese",
   },
@@ -94,21 +94,21 @@ const BOTTOM_LAYERS: LayerDef[] = [
   },
   {
     x: 4, count: 3, label: "Summariser",
-    simple: "Same compression step — the celebrity face becomes a single summary ready to compare with yours.",
+    simple: "Same compression step - the celebrity face becomes a single summary ready to compare with yours.",
     detail: "Same adaptive average pool 12x12 → 1x1. Output vectors are directly comparable because the same transformation was applied.",
     sectionId: "s-siamese",
   },
   {
     x: 6, count: 2, label: "Face fingerprint",
     simple: "The celebrity gets their 256-number fingerprint. Now both fingerprints are in the same space.",
-    detail: "Same Linear(512→256) + L2 normalisation. Distance between unit vectors is geometrically meaningful — cos(e1,e2) = 1 - d^2/2.",
+    detail: "Same Linear(512→256) + L2 normalisation. Distance between unit vectors is geometrically meaningful - cos(e1,e2) = 1 - d^2/2.",
     sectionId: "s-siamese",
   },
 ]
 
 const DISTANCE_LAYER: LayerDef = {
   x: 8.5, count: 1, label: "Similarity score",
-  simple: "The gap between the two fingerprints — small gap means the same person, large gap means different people.",
+  simple: "The gap between the two fingerprints - small gap means the same person, large gap means different people.",
   detail: "L2 distance ||f(x1) - f(x2)||_2, range [0,2] on unit sphere. Threshold ~0.5. BCE head: sigmoid(|e1-e2| * W + b) -> similarity in [0,1].",
   sectionId: "s-contrastive",
   isDistance: true,
@@ -143,7 +143,7 @@ export function NeuralDeepViz() {
     signalParticles: THREE.Mesh[]
     signalProgress: number[]
     signalPaths: Array<{ start: THREE.Vector3; end: THREE.Vector3 }>
-    signalWobble: Array<{ px: number; py: number; amp: number; freq: number; phase: number; tMin: number; tMax: number }>
+    signalWobble: Array<{ px: number; py: number; amp: number; freq: number; phase: number }>
     raycaster: THREE.Raycaster
     mouse: THREE.Vector2
   } | null>(null)
@@ -196,9 +196,11 @@ export function NeuralDeepViz() {
           const mat = new THREE.MeshStandardMaterial({
             color: nodeColor,
             emissive: emissiveColor,
-            emissiveIntensity: layer.isInput ? 0.8 : layer.isDistance ? 1.0 : 0.3,
-            roughness: 0.2,
-            metalness: 0.5,
+            emissiveIntensity: layer.isInput ? 1.2 : layer.isDistance ? 1.4 : 0.6,
+            roughness: 0.9,
+            metalness: 0.0,
+            transparent: true,
+            opacity: layer.isInput ? 0.85 : layer.isDistance ? 0.85 : 0.75,
           })
           const mesh = new THREE.Mesh(geo, mat)
           mesh.position.set(layer.x, yOffset + yLocal, 0)
@@ -297,45 +299,39 @@ export function NeuralDeepViz() {
         emissiveIntensity: 1.8,
         transparent: true,
         opacity: 0,
+        stencilWrite: false,
+        stencilRef: 0,
+        stencilFunc: THREE.EqualStencilFunc,
       })
       const mesh = new THREE.Mesh(geo, mat)
       scene.add(mesh)
       signalParticles.push(mesh)
-      signalProgress.push(0.2 + Math.random() * 0.6)
 
-      const path = signalPaths[i]
-      const pathLen = path.start.distanceTo(path.end)
-      const dir = new THREE.Vector3().subVectors(path.end, path.start).normalize()
-
-      // Sphere radii at each end — determines how far into the path the particle stays hidden
-      let rStart = 0.14
-      let rEnd = 0.14
-      if (isTop) {
-        const li = i
-        if (TOP_LAYERS[li].isInput) rStart = 0.38
-        if (TOP_LAYERS[li + 1]?.isDistance) rEnd = 0.42
-      } else if (isBottom) {
-        const li = i - topCount
-        if (BOTTOM_LAYERS[li].isInput) rStart = 0.38
-        if (BOTTOM_LAYERS[li + 1]?.isDistance) rEnd = 0.42
+      // Stagger start: top/bottom pairs share the same initial phase so they're symmetrical
+      if (isDist) {
+        signalProgress.push(0.5)
+      } else if (isTop) {
+        signalProgress.push(0.2 + (i / topCount) * 0.6)
       } else {
-        // dist paths: regular start → large distance node
-        rStart = 0.14
-        rEnd = 0.42
+        signalProgress.push(0.2 + ((i - topCount) / bottomCount) * 0.6)
       }
 
-      const tMin = Math.min(rStart / pathLen, 0.4)
-      const tMax = Math.max(1 - rEnd / pathLen, 0.6)
+      const path = signalPaths[i]
+      const dir = new THREE.Vector3().subVectors(path.end, path.start).normalize()
 
-      signalWobble.push({
-        px: -dir.y,
-        py: dir.x,
-        amp: isDist ? 0 : 0.22 + Math.random() * 0.18,
-        freq: isDist ? 1 : 2 + Math.random() * 2,
-        phase: Math.random() * Math.PI * 2,
-        tMin,
-        tMax,
-      })
+      if (isBottom) {
+        // Mirror the corresponding top path's wobble for vertical symmetry
+        const top = signalWobble[i - topCount]
+        signalWobble.push({ px: top.px, py: -top.py, amp: top.amp, freq: top.freq, phase: top.phase })
+      } else {
+        signalWobble.push({
+          px: -dir.y,
+          py: dir.x,
+          amp: isDist ? 0 : 0.22 + Math.random() * 0.18,
+          freq: isDist ? 1 : 2 + Math.random() * 2,
+          phase: Math.random() * Math.PI * 2,
+        })
+      }
     }
 
     const raycaster = new THREE.Raycaster()
@@ -350,32 +346,24 @@ export function NeuralDeepViz() {
     data.controls.update()
 
     for (let i = 0; i < data.signalParticles.length; i++) {
-      data.signalProgress[i] += 0.006
-      if (data.signalProgress[i] > 1) data.signalProgress[i] = 0
+      // Loop only within [0.2, 0.8] - at both endpoints opacity=0 so reset is seamless
+      data.signalProgress[i] += 0.003
+      if (data.signalProgress[i] > 0.8) data.signalProgress[i] = 0.2
 
       const t = data.signalProgress[i]
-      const path = data.signalPaths[i]
       const w = data.signalWobble[i]
-      const mat = data.signalParticles[i].material as THREE.MeshStandardMaterial
+      const mesh = data.signalParticles[i]
+      const mat = mesh.material as THREE.MeshStandardMaterial
+      const path = data.signalPaths[i]
 
-      if (t < w.tMin || t > w.tMax) {
-        // outside sphere-safe zone — park off-scene
-        mat.opacity = 0
-        data.signalParticles[i].position.set(9999, 9999, 9999)
-      } else {
-        // remap t to [0,1] within the visible corridor for a clean fade in/out
-        const tNorm = (t - w.tMin) / (w.tMax - w.tMin)
-        const raw = Math.sin(tNorm * Math.PI)
-        const envelope = raw * raw * raw
-        mat.opacity = envelope * 0.95
-        const wobble = Math.sin(t * Math.PI * w.freq + w.phase) * w.amp * envelope
-        const base = new THREE.Vector3().lerpVectors(path.start, path.end, t)
-        data.signalParticles[i].position.set(
-          base.x + w.px * wobble,
-          base.y + w.py * wobble,
-          base.z
-        )
-      }
+      const tNorm = (t - 0.2) / 0.6            // remap [0.2, 0.8] → [0, 1]
+      const raw = Math.sin(tNorm * Math.PI)
+      const envelope = raw * raw * raw
+      mat.opacity = envelope * 0.95
+
+      const wobble = Math.sin(t * Math.PI * w.freq + w.phase) * w.amp * envelope
+      const base = new THREE.Vector3().lerpVectors(path.start, path.end, t)
+      mesh.position.set(base.x + w.px * wobble, base.y + w.py * wobble, base.z)
     }
 
     data.raycaster.setFromCamera(data.mouse, data.camera)
@@ -454,10 +442,19 @@ export function NeuralDeepViz() {
             else obj.material.dispose()
           }
         })
-        if (canvas && data.renderer.domElement.parentNode === canvas) {
-          canvas.removeChild(data.renderer.domElement)
+        // Dispose signal particles not currently in the scene (never added or already removed)
+        for (const p of data.signalParticles) {
+          if (!p.parent) {
+            p.geometry.dispose()
+            ;(p.material as THREE.Material).dispose()
+          }
+        }
+        // Force-remove ALL canvas children so a stale frozen frame can't linger (StrictMode)
+        if (canvas) {
+          while (canvas.firstChild) canvas.removeChild(canvas.firstChild)
         }
       }
+      sceneDataRef.current = null
     }
   }, [buildScene, animate, handleResize, handleMouseMove])
 
