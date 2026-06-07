@@ -60,10 +60,12 @@ export function ParticleTextEffect({ words = ["OLLIE"] }: ParticleTextEffectProp
     const offscreen = document.createElement("canvas")
     offscreen.width = canvas.width; offscreen.height = canvas.height
     const offCtx = offscreen.getContext("2d")!
-    offCtx.fillStyle = "white"; offCtx.font = "bold 100px Arial"; offCtx.textAlign = "center"; offCtx.textBaseline = "middle"
+    offCtx.fillStyle = "white"
+    offCtx.font = `bold ${Math.floor(canvas.height * 0.52)}px Arial`
+    offCtx.textAlign = "center"; offCtx.textBaseline = "middle"
     offCtx.fillText(word, canvas.width / 2, canvas.height / 2)
     const imageData = offCtx.getImageData(0, 0, canvas.width, canvas.height); const pixels = imageData.data
-    const newColor = { r: Math.random() * 200 + 55, g: Math.random() * 200 + 55, b: Math.random() * 200 + 55 }
+    const newColor = { r: 230, g: 230, b: 235 }
     const particles = particlesRef.current; let particleIndex = 0
     const coordsIndexes: number[] = []
     for (let i = 0; i < pixels.length; i += pixelSteps * 4) coordsIndexes.push(i)
@@ -94,11 +96,11 @@ export function ParticleTextEffect({ words = ["OLLIE"] }: ParticleTextEffectProp
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return
-    canvas.width = 1000; canvas.height = 200
+    canvas.width = 1400; canvas.height = 280
     nextWord(words[0], canvas)
     const animate = () => {
       const ctx = canvas.getContext("2d")!; const particles = particlesRef.current
-      ctx.fillStyle = "rgba(0,0,0,0.1)"; ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i]; p.move(); p.draw(ctx, true)
         if (p.isKilled && (p.pos.x < 0 || p.pos.x > canvas.width || p.pos.y < 0 || p.pos.y > canvas.height)) particles.splice(i, 1)

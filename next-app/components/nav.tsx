@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -37,7 +37,7 @@ export function Nav() {
         {/* Logo */}
         <Link
           href="/"
-          className="text-white font-black text-xl tracking-widest hover:text-[--ollie-cyan] transition-colors"
+          className="text-white font-black text-xl tracking-widest hover:text-(--ollie-cyan) transition-colors"
         >
           OLLIE
         </Link>
@@ -52,7 +52,7 @@ export function Nav() {
                   href={link.href}
                   className={`text-sm transition-colors ${
                     isActive
-                      ? "text-[--ollie-cyan] font-semibold"
+                      ? "text-(--ollie-cyan) font-semibold"
                       : "text-white/60 hover:text-white"
                   }`}
                 >
@@ -66,7 +66,7 @@ export function Nav() {
         {/* Desktop CTA */}
         <Link
           href="/find"
-          className="hidden md:block text-sm font-semibold px-4 py-2 rounded-full bg-[--ollie-cyan] text-black hover:opacity-90 transition-opacity"
+          className="hidden md:block text-sm font-semibold px-4 py-2 rounded-full bg-(--ollie-cyan) text-black hover:opacity-90 transition-opacity"
         >
           Try It Free
         </Link>
@@ -100,7 +100,7 @@ export function Nav() {
                       href={link.href}
                       onClick={() => setOpen(false)}
                       className={`block w-full py-3 text-sm transition-colors border-b border-white/5 last:border-0 ${
-                        isActive ? "text-[--ollie-cyan] font-semibold" : "text-white/70 hover:text-white"
+                        isActive ? "text-(--ollie-cyan) font-semibold" : "text-white/70 hover:text-white"
                       }`}
                     >
                       {link.label}
@@ -112,7 +112,7 @@ export function Nav() {
                 <Link
                   href="/find"
                   onClick={() => setOpen(false)}
-                  className="block w-full text-center text-sm font-semibold py-3 rounded-full bg-[--ollie-cyan] text-black hover:opacity-90 transition-opacity"
+                  className="block w-full text-center text-sm font-semibold py-3 rounded-full bg-(--ollie-cyan) text-black hover:opacity-90 transition-opacity"
                 >
                   Try It Free
                 </Link>

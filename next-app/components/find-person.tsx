@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { motion } from "framer-motion"
 import { Lock } from "lucide-react"
@@ -15,7 +15,7 @@ export function FindPerson() {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[--ollie-purple]/40 bg-[--ollie-purple]/10 text-[--ollie-purple] text-xs font-semibold tracking-wide mb-4">
+          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-(--ollie-purple)/40 bg-(--ollie-purple)/10 text-(--ollie-purple) text-xs font-semibold tracking-wide mb-4">
             Coming Soon
           </span>
           <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight">
@@ -88,15 +88,15 @@ export function FindPerson() {
                 ],
               }}
               transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
-              className="p-5 rounded-2xl bg-[--ollie-purple]/10 border border-[--ollie-purple]/30"
+              className="p-5 rounded-2xl bg-(--ollie-purple)/10 border border-(--ollie-purple)/30"
             >
-              <Lock size={36} className="text-[--ollie-purple]" />
+              <Lock size={36} className="text-(--ollie-purple)" />
             </motion.div>
 
             {/* 8bit COMING SOON badge */}
             <div className="text-center">
               <p
-                className="retro text-[--ollie-purple] text-sm md:text-base"
+                className="retro text-(--ollie-purple) text-sm md:text-base"
                 style={{ textShadow: "0 0 20px oklch(0.65 0.22 290 / 60%)" }}
               >
                 COMING SOON
@@ -114,7 +114,7 @@ export function FindPerson() {
                     key={i}
                     animate={{ opacity: [0.2, 1, 0.2] }}
                     transition={{ repeat: Infinity, duration: 1.5, delay: i * 0.2 }}
-                    className={`rounded-full ${i <= 2 ? "bg-[--ollie-purple]" : "bg-white/15"}`}
+                    className={`rounded-full ${i <= 2 ? "bg-(--ollie-purple)" : "bg-white/15"}`}
                     style={{ width: 8, height: 8 }}
                   />
                 ))}

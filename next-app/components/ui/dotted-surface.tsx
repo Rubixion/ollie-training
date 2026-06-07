@@ -24,7 +24,7 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 		const AMOUNTX = 40;
 		const AMOUNTY = 60;
 		const scene = new THREE.Scene();
-		scene.fog = new THREE.Fog(0xffffff, 2000, 10000);
+		scene.fog = new THREE.Fog(0x000000, 2000, 8000);
 		const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000);
 		camera.position.set(0, 355, 1220);
 		const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
@@ -38,7 +38,7 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 		for (let ix = 0; ix < AMOUNTX; ix++) {
 			for (let iy = 0; iy < AMOUNTY; iy++) {
 				positions.push(ix * SEPARATION - (AMOUNTX * SEPARATION) / 2, 0, iy * SEPARATION - (AMOUNTY * SEPARATION) / 2);
-				if (theme === 'dark') { colors.push(200, 200, 200); } else { colors.push(60, 60, 60); }
+				if (theme === 'dark') { colors.push(0.75, 0.75, 0.75); } else { colors.push(0.15, 0.15, 0.15); }
 			}
 		}
 		geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));

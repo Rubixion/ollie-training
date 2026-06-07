@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -23,7 +23,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "CAN I SEARCH THE INTERNET?",
-    a: "Not yet. Internet search is in development under 'Find Person' — check back soon.",
+    a: "Not yet. Internet search is in development under 'Find Person' â€” check back soon.",
   },
   {
     q: "HOW DO I HELP IMPROVE IT?",
@@ -62,12 +62,12 @@ function AccordionItem({
       >
         <span
           className={`retro text-[10px] md:text-xs leading-relaxed transition-colors ${
-            isOpen ? "text-[--ollie-cyan]" : "text-white/60 group-hover:text-white/80"
+            isOpen ? "text-(--ollie-cyan)" : "text-white/60 group-hover:text-white/80"
           }`}
         >
           {item.q}
         </span>
-        <span className={`shrink-0 ml-4 transition-colors ${isOpen ? "text-[--ollie-cyan]" : "text-white/30"}`}>
+        <span className={`shrink-0 ml-4 transition-colors ${isOpen ? "text-(--ollie-cyan)" : "text-white/30"}`}>
           {isOpen ? <Minus size={14} /> : <Plus size={14} />}
         </span>
       </button>
@@ -106,11 +106,11 @@ export function FaqSection() {
         >
           {/* Pixel character */}
           <div className="text-5xl mb-6 select-none" role="img" aria-label="gamepad">
-            🎮
+            ðŸŽ®
           </div>
 
           <h2 className="retro text-xl md:text-2xl text-white mb-3">HELP CENTER</h2>
-          <p className="retro text-[--ollie-cyan] text-[10px] tracking-widest">
+          <p className="retro text-(--ollie-cyan) text-[10px] tracking-widest">
             PRESS START TO GET ANSWERS
           </p>
         </motion.div>

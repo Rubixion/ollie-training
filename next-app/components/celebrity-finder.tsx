@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useRef, useCallback, DragEvent, ChangeEvent } from "react"
 import { motion } from "framer-motion"
@@ -148,7 +148,7 @@ export function CelebrityFinder() {
           transition={{ duration: 0.6 }}
           className="mb-12 text-center"
         >
-          <span className="inline-block text-xs font-semibold tracking-widest text-[--ollie-cyan] uppercase mb-3">
+          <span className="inline-block text-xs font-semibold tracking-widest text-(--ollie-cyan) uppercase mb-3">
             Core Feature
           </span>
           <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight">
@@ -175,7 +175,7 @@ export function CelebrityFinder() {
               onClick={() => !imageDataUrl && fileInputRef.current?.click()}
               className={`relative rounded-2xl border-2 border-dashed transition-all cursor-pointer
                 ${isDragging
-                  ? "border-[--ollie-cyan] bg-[--ollie-glow]"
+                  ? "border-(--ollie-cyan) bg-(--ollie-glow)"
                   : imageDataUrl
                     ? "border-white/10 bg-white/[0.02]"
                     : "border-white/15 bg-white/[0.02] hover:border-white/30 hover:bg-white/[0.03]"
@@ -208,7 +208,7 @@ export function CelebrityFinder() {
                     <p className="text-white/70 font-medium">Drag &amp; drop your photo</p>
                     <p className="text-white/30 text-sm mt-1">or click to browse</p>
                   </div>
-                  <span className="text-white/20 text-xs">JPG, PNG, WEBP · Max 10 MB</span>
+                  <span className="text-white/20 text-xs">JPG, PNG, WEBP Â· Max 10 MB</span>
                 </div>
               )}
               <input
@@ -230,7 +230,7 @@ export function CelebrityFinder() {
                     onClick={() => setMode(m)}
                     className={`flex-1 py-2 px-2 text-xs font-semibold rounded-xl border transition-all ${
                       mode === m
-                        ? "border-[--ollie-cyan] bg-[--ollie-cyan]/10 text-[--ollie-cyan]"
+                        ? "border-(--ollie-cyan) bg-(--ollie-cyan)/10 text-(--ollie-cyan)"
                         : "border-white/10 bg-white/[0.02] text-white/40 hover:border-white/20 hover:text-white/60"
                     }`}
                   >
@@ -246,7 +246,7 @@ export function CelebrityFinder() {
               disabled={!imageDataUrl || loading}
               className={`flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-bold text-sm transition-all
                 ${imageDataUrl && !loading
-                  ? "bg-[--ollie-cyan] text-black hover:opacity-90 active:scale-[0.98] shadow-lg shadow-[--ollie-glow]"
+                  ? "bg-(--ollie-cyan) text-black hover:opacity-90 active:scale-[0.98] shadow-lg shadow-(--ollie-glow)"
                   : "bg-white/5 text-white/20 cursor-not-allowed"
                 }`}
             >
@@ -288,7 +288,7 @@ export function CelebrityFinder() {
               {/* Loading */}
               {loading && (
                 <div className="h-full flex flex-col items-center justify-center gap-4 py-16">
-                  <Loader2 size={36} className="text-[--ollie-cyan] animate-spin" />
+                  <Loader2 size={36} className="text-(--ollie-cyan) animate-spin" />
                   <p className="text-white/40 text-sm">Scanning faces...</p>
                 </div>
               )}
@@ -329,7 +329,7 @@ export function CelebrityFinder() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="text-white text-sm font-semibold truncate">{match.name}</span>
-                          <span className="text-[--ollie-cyan] text-xs font-bold ml-2 shrink-0">
+                          <span className="text-(--ollie-cyan) text-xs font-bold ml-2 shrink-0">
                             {match.similarity.toFixed(1)}%
                           </span>
                         </div>
@@ -338,14 +338,14 @@ export function CelebrityFinder() {
                             initial={{ width: 0 }}
                             animate={{ width: `${Math.min(match.similarity, 100)}%` }}
                             transition={{ duration: 0.8, delay: i * 0.1 + 0.2, ease: "easeOut" }}
-                            className="h-full rounded-full bg-[--ollie-cyan]"
+                            className="h-full rounded-full bg-(--ollie-cyan)"
                           />
                         </div>
                       </div>
 
                       {/* Rank badge */}
                       {i === 0 && (
-                        <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-[--ollie-cyan]/15 text-[--ollie-cyan] border border-[--ollie-cyan]/30">
+                        <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-(--ollie-cyan)/15 text-(--ollie-cyan) border border-(--ollie-cyan)/30">
                           #1
                         </span>
                       )}

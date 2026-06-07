@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -6,9 +6,9 @@ import { Plus, Minus, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { Nav } from "@/components/nav"
 import { Footer } from "@/components/footer"
-import { DottedSurface } from "@/components/ui/dotted-surface"
+import { BGPattern } from "@/components/bg-pattern"
 
-// ── FAQ data ────────────────────────────────────────────────────────────────
+// â”€â”€ FAQ data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const FAQ_ITEMS = [
   {
@@ -29,7 +29,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "CAN I SEARCH THE INTERNET?",
-    a: "Not yet. Internet search is in development under 'Find Person' — check back soon.",
+    a: "Not yet. Internet search is in development under 'Find Person' â€” check back soon.",
   },
   {
     q: "HOW DO I HELP IMPROVE IT?",
@@ -37,7 +37,7 @@ const FAQ_ITEMS = [
   },
 ]
 
-// ── Changelog data ───────────────────────────────────────────────────────────
+// â”€â”€ Changelog data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ENTRIES = [
   {
@@ -66,7 +66,7 @@ const ENTRIES = [
   },
 ]
 
-// ── Accordion item ───────────────────────────────────────────────────────────
+// â”€â”€ Accordion item â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function AccordionItem({
   item,
@@ -99,12 +99,12 @@ function AccordionItem({
       >
         <span
           className={`retro text-[10px] md:text-xs leading-relaxed transition-colors ${
-            isOpen ? "text-[--ollie-cyan]" : "text-white/60 group-hover:text-white/80"
+            isOpen ? "text-(--ollie-cyan)" : "text-white/60 group-hover:text-white/80"
           }`}
         >
           {item.q}
         </span>
-        <span className={`shrink-0 ml-4 transition-colors ${isOpen ? "text-[--ollie-cyan]" : "text-white/30"}`}>
+        <span className={`shrink-0 ml-4 transition-colors ${isOpen ? "text-(--ollie-cyan)" : "text-white/30"}`}>
           {isOpen ? <Minus size={14} /> : <Plus size={14} />}
         </span>
       </button>
@@ -127,7 +127,7 @@ function AccordionItem({
   )
 }
 
-// ── Tab content components ───────────────────────────────────────────────────
+// â”€â”€ Tab content components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function HelpFaqTab() {
   const [openIndex, setOpenIndex] = useState<number | null>(0)
@@ -135,9 +135,9 @@ function HelpFaqTab() {
   return (
     <div>
       <div className="text-center mb-10">
-        <div className="text-5xl mb-6 select-none" role="img" aria-label="gamepad">🎮</div>
+        <div className="text-5xl mb-6 select-none" role="img" aria-label="gamepad">ðŸŽ®</div>
         <h2 className="retro text-xl md:text-2xl text-white mb-3">HELP CENTER</h2>
-        <p className="retro text-[--ollie-cyan] text-[10px] tracking-widest">PRESS START TO GET ANSWERS</p>
+        <p className="retro text-(--ollie-cyan) text-[10px] tracking-widest">PRESS START TO GET ANSWERS</p>
       </div>
       <div className="max-w-2xl mx-auto flex flex-col gap-2">
         {FAQ_ITEMS.map((item, i) => (
@@ -194,7 +194,7 @@ function ChangelogTab() {
                       {entry.version}
                     </span>
                     {entry.badge && (
-                      <span className="retro text-[8px] px-2 py-0.5 bg-[--ollie-cyan] text-black">
+                      <span className="retro text-[8px] px-2 py-0.5 bg-(--ollie-cyan) text-black">
                         {entry.badge}
                       </span>
                     )}
@@ -215,7 +215,7 @@ function AboutTab() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="text-center mb-12">
-        <div className="text-5xl mb-6 select-none" role="img" aria-label="brain">🧠</div>
+        <div className="text-5xl mb-6 select-none" role="img" aria-label="brain">ðŸ§ </div>
         <h2 className="retro text-lg md:text-xl text-white mb-3">ABOUT OLLIE</h2>
         <p className="retro text-[10px] text-white/30 tracking-widest">OPEN SOURCE FACE RECOGNITION</p>
       </div>
@@ -236,7 +236,7 @@ function AboutTab() {
             { label: "Embeddings", value: "256-dim", sub: "L2 normalized" },
           ].map((stat) => (
             <div key={stat.label} className="p-4 rounded-xl bg-white/[0.03] border border-white/10 text-center">
-              <div className="text-[--ollie-cyan] font-black text-xl mb-1">{stat.value}</div>
+              <div className="text-(--ollie-cyan) font-black text-xl mb-1">{stat.value}</div>
               <div className="text-white/60 text-xs font-semibold">{stat.label}</div>
               <div className="text-white/30 text-xs mt-0.5">{stat.sub}</div>
             </div>
@@ -257,7 +257,7 @@ function AboutTab() {
         <div className="flex justify-center">
           <Link
             href="/neural"
-            className="group flex items-center gap-2 px-6 py-3 rounded-full bg-[--ollie-cyan]/10 border border-[--ollie-cyan]/30 text-[--ollie-cyan] text-sm font-semibold hover:bg-[--ollie-cyan]/20 transition-all"
+            className="group flex items-center gap-2 px-6 py-3 rounded-full bg-(--ollie-cyan)/10 border border-(--ollie-cyan)/30 text-(--ollie-cyan) text-sm font-semibold hover:bg-(--ollie-cyan)/20 transition-all"
           >
             Explore the Neural Architecture
             <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
@@ -268,7 +268,7 @@ function AboutTab() {
   )
 }
 
-// ── Main page ────────────────────────────────────────────────────────────────
+// â”€â”€ Main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const TABS = [
   { id: "faq", label: "Help & FAQ" },
@@ -282,8 +282,8 @@ export default function InfoPage() {
   const [activeTab, setActiveTab] = useState<TabId>("faq")
 
   return (
-    <main className="relative min-h-screen bg-black">
-      <DottedSurface />
+    <main className="relative min-h-screen bg-transparent">
+      <BGPattern variant="horizontal-lines" mask="fade-edges" fill="rgba(255,255,255,0.06)" size={28} className="fixed" />
       <Nav />
 
       <div className="pt-24 pb-32 px-6">
@@ -304,7 +304,7 @@ export default function InfoPage() {
                   {activeTab === tab.id && (
                     <motion.div
                       layoutId="tab-bg"
-                      className="absolute inset-0 bg-[--ollie-cyan] rounded-lg"
+                      className="absolute inset-0 bg-(--ollie-cyan) rounded-lg"
                       transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
                     />
                   )}

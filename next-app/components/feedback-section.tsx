@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useRef, useCallback, ChangeEvent, DragEvent } from "react"
 import { motion } from "framer-motion"
@@ -42,7 +42,7 @@ function MiniUploader({
         onDrop={onDrop}
         onClick={() => !value && inputRef.current?.click()}
         className={`relative rounded-xl border-2 border-dashed transition-all cursor-pointer flex items-center justify-center
-          ${dragging ? "border-[--ollie-cyan] bg-[--ollie-glow]" : value ? "border-white/10 bg-white/[0.02]" : "border-white/15 bg-white/[0.02] hover:border-white/25 hover:bg-white/[0.03]"}
+          ${dragging ? "border-(--ollie-cyan) bg-(--ollie-glow)" : value ? "border-white/10 bg-white/[0.02]" : "border-white/15 bg-white/[0.02] hover:border-white/25 hover:bg-white/[0.03]"}
         `}
         style={{ height: 140 }}
       >
@@ -134,7 +134,7 @@ export function FeedbackSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          <span className="inline-block text-xs font-semibold tracking-widest text-[--ollie-cyan] uppercase mb-3">
+          <span className="inline-block text-xs font-semibold tracking-widest text-(--ollie-cyan) uppercase mb-3">
             Improve the Model
           </span>
           <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight">
@@ -228,7 +228,7 @@ export function FeedbackSection() {
                 disabled={!canSubmit}
                 className={`flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-bold text-sm transition-all
                   ${canSubmit
-                    ? "bg-[--ollie-cyan] text-black hover:opacity-90 active:scale-[0.98] shadow-lg shadow-[--ollie-glow]"
+                    ? "bg-(--ollie-cyan) text-black hover:opacity-90 active:scale-[0.98] shadow-lg shadow-(--ollie-glow)"
                     : "bg-white/5 text-white/20 cursor-not-allowed"
                   }`}
               >

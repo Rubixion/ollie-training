@@ -1,10 +1,10 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Zap } from "lucide-react"
 
-const WORDS = ["celebrity lookalike", "famous twin", "visual match", "doppelgänger"]
+const WORDS = ["celebrity lookalike", "famous twin", "visual match", "doppelgÃ¤nger"]
 
 export function Hero() {
   const [wordIndex, setWordIndex] = useState(0)
@@ -24,7 +24,7 @@ export function Hero() {
   }
 
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[--ollie-bg] pt-16">
+    <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-(--ollie-bg) pt-16">
       {/* Grid overlay */}
       <div
         className="absolute inset-0 opacity-[0.04]"
@@ -60,7 +60,7 @@ export function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[--ollie-cyan]/40 bg-[--ollie-cyan]/8 text-[--ollie-cyan] text-xs font-semibold tracking-wide">
+          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-(--ollie-cyan)/40 bg-(--ollie-cyan)/8 text-(--ollie-cyan) text-xs font-semibold tracking-wide">
             <Zap size={12} className="fill-current" />
             Powered by Siamese Neural Networks
           </span>
@@ -92,7 +92,7 @@ export function Hero() {
                 animate={{ y: "0%", opacity: 1 }}
                 exit={{ y: "-100%", opacity: 0 }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                className="absolute inset-0 text-[--ollie-cyan]"
+                className="absolute inset-0 text-(--ollie-cyan)"
               >
                 {WORDS[wordIndex]}
               </motion.span>
@@ -119,7 +119,7 @@ export function Hero() {
         >
           <button
             onClick={scrollToFinder}
-            className="px-8 py-3.5 rounded-full bg-[--ollie-cyan] text-black font-bold text-sm hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-[--ollie-glow]"
+            className="px-8 py-3.5 rounded-full bg-(--ollie-cyan) text-black font-bold text-sm hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-(--ollie-glow)"
           >
             Try It Now
           </button>

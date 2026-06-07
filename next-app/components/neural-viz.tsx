@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useRef, useState } from "react"
 import { motion } from "framer-motion"
@@ -39,7 +39,7 @@ function CssFallback() {
                   delay: (li * 0.3 + ni * 0.1) % 2,
                   ease: "easeInOut",
                 }}
-                className={`rounded-full border border-[--ollie-cyan]/60 bg-[--ollie-cyan]/10 shadow-[0_0_8px_var(--ollie-glow)]
+                className={`rounded-full border border-(--ollie-cyan)/60 bg-(--ollie-cyan)/10 shadow-[0_0_8px_var(--ollie-glow)]
                   ${layer.size === "large" ? "w-8 h-8" : layer.size === "small" ? "w-5 h-5" : "w-3 h-3"}`}
               />
             ))}
@@ -258,7 +258,7 @@ export function NeuralViz() {
   }, [])
 
   const layerLabels = [
-    { label: "Input Face", sub: "224×224 px" },
+    { label: "Input Face", sub: "224Ã—224 px" },
     { label: "Conv Layers", sub: "Feature maps" },
     { label: "Dense Layer", sub: "512-dim" },
     { label: "Embedding", sub: "128-dim" },
@@ -275,7 +275,7 @@ export function NeuralViz() {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          <span className="inline-block text-xs font-semibold tracking-widest text-[--ollie-cyan] uppercase mb-3">
+          <span className="inline-block text-xs font-semibold tracking-widest text-(--ollie-cyan) uppercase mb-3">
             Architecture
           </span>
           <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight">
@@ -320,7 +320,7 @@ export function NeuralViz() {
             {
               step: "02",
               title: "Identical CNN layers",
-              desc: "Both images pass through the same convolutional layers — weights are shared. Each layer learns increasingly abstract facial features.",
+              desc: "Both images pass through the same convolutional layers â€” weights are shared. Each layer learns increasingly abstract facial features.",
             },
             {
               step: "03",
@@ -329,7 +329,7 @@ export function NeuralViz() {
             },
           ].map((item) => (
             <div key={item.step} className="p-5 rounded-xl bg-white/[0.02] border border-white/5">
-              <span className="text-[--ollie-cyan]/50 text-xs font-mono">{item.step}</span>
+              <span className="text-(--ollie-cyan)/50 text-xs font-mono">{item.step}</span>
               <h3 className="text-white font-bold mt-2 mb-2">{item.title}</h3>
               <p className="text-white/40 text-sm leading-relaxed">{item.desc}</p>
             </div>

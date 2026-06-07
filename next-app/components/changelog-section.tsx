@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { motion } from "framer-motion"
 
@@ -87,7 +87,7 @@ export function ChangelogSection() {
                         {entry.version}
                       </span>
                       {entry.badge && (
-                        <span className="retro text-[8px] px-2 py-0.5 bg-[--ollie-cyan] text-black">
+                        <span className="retro text-[8px] px-2 py-0.5 bg-(--ollie-cyan) text-black">
                           {entry.badge}
                         </span>
                       )}

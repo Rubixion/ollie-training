@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import * as THREE from "three"
@@ -15,28 +15,28 @@ interface LayerDef {
 }
 
 const TOP_LAYERS: LayerDef[] = [
-  { x: -6, count: 1, label: "INPUT IMAGE", detail: "96×96×3 RGB face image. Normalized to [-1,1] range. Each pixel becomes a floating-point value.", sectionId: "s-backbone", isInput: true },
-  { x: -4, count: 4, label: "CONV 3×3", detail: "64 channels, 3×3 convolutions with BatchNorm + ReLU. Detects low-level edges and textures.", sectionId: "s-backbone" },
-  { x: -2, count: 4, label: "RESIDUAL 128ch", detail: "ResBlock: stride=2, 128 channels. Skip connection via 1×1 projection prevents vanishing gradients.", sectionId: "s-backbone" },
-  { x: 0, count: 6, label: "RESIDUAL 256ch", detail: "ResBlock: stride=2, 256 channels. Feature map shrinks to 24×24. Learns mid-level facial structure.", sectionId: "s-backbone" },
-  { x: 2, count: 6, label: "RESIDUAL 512ch", detail: "ResBlock: stride=2, 512 channels. Feature map: 12×12. High-level identity features emerge here.", sectionId: "s-backbone" },
-  { x: 4, count: 3, label: "GLOBAL AVG POOL", detail: "6×6 adaptive average pooling collapses spatial dims → 512-d vector. Spatial invariance.", sectionId: "s-backbone" },
-  { x: 6, count: 2, label: "L2-NORM 256d", detail: "FC 512→256 + L2 normalization. Projects to unit hypersphere. Enables cosine similarity.", sectionId: "s-siamese" },
+  { x: -6, count: 1, label: "INPUT IMAGE", detail: "96Ã—96Ã—3 RGB face image. Normalized to [-1,1] range. Each pixel becomes a floating-point value.", sectionId: "s-backbone", isInput: true },
+  { x: -4, count: 4, label: "CONV 3Ã—3", detail: "64 channels, 3Ã—3 convolutions with BatchNorm + ReLU. Detects low-level edges and textures.", sectionId: "s-backbone" },
+  { x: -2, count: 4, label: "RESIDUAL 128ch", detail: "ResBlock: stride=2, 128 channels. Skip connection via 1Ã—1 projection prevents vanishing gradients.", sectionId: "s-backbone" },
+  { x: 0, count: 6, label: "RESIDUAL 256ch", detail: "ResBlock: stride=2, 256 channels. Feature map shrinks to 24Ã—24. Learns mid-level facial structure.", sectionId: "s-backbone" },
+  { x: 2, count: 6, label: "RESIDUAL 512ch", detail: "ResBlock: stride=2, 512 channels. Feature map: 12Ã—12. High-level identity features emerge here.", sectionId: "s-backbone" },
+  { x: 4, count: 3, label: "GLOBAL AVG POOL", detail: "6Ã—6 adaptive average pooling collapses spatial dims â†’ 512-d vector. Spatial invariance.", sectionId: "s-backbone" },
+  { x: 6, count: 2, label: "L2-NORM 256d", detail: "FC 512â†’256 + L2 normalization. Projects to unit hypersphere. Enables cosine similarity.", sectionId: "s-siamese" },
 ]
 
 const BOTTOM_LAYERS: LayerDef[] = [
-  { x: -6, count: 1, label: "INPUT IMAGE", detail: "Second face — Siamese twin input. Both networks share identical weights.", sectionId: "s-siamese", isInput: true },
-  { x: -4, count: 4, label: "CONV 3×3", detail: "Exact same weights as the top network. Weight sharing is what makes it 'Siamese'.", sectionId: "s-siamese" },
-  { x: -2, count: 4, label: "RESIDUAL 128ch", detail: "Same weights — stride=2, 128 channels. Ensures both embeddings live in the same space.", sectionId: "s-siamese" },
-  { x: 0, count: 6, label: "RESIDUAL 256ch", detail: "Same weights — stride=2, 256 channels. No separate learning for each input.", sectionId: "s-siamese" },
-  { x: 2, count: 6, label: "RESIDUAL 512ch", detail: "Same weights — stride=2, 512 channels. Both faces processed identically.", sectionId: "s-siamese" },
-  { x: 4, count: 3, label: "GLOBAL AVG POOL", detail: "Same pooling operation — 6×6 → 512d. Output vectors are comparable by design.", sectionId: "s-siamese" },
+  { x: -6, count: 1, label: "INPUT IMAGE", detail: "Second face â€” Siamese twin input. Both networks share identical weights.", sectionId: "s-siamese", isInput: true },
+  { x: -4, count: 4, label: "CONV 3Ã—3", detail: "Exact same weights as the top network. Weight sharing is what makes it 'Siamese'.", sectionId: "s-siamese" },
+  { x: -2, count: 4, label: "RESIDUAL 128ch", detail: "Same weights â€” stride=2, 128 channels. Ensures both embeddings live in the same space.", sectionId: "s-siamese" },
+  { x: 0, count: 6, label: "RESIDUAL 256ch", detail: "Same weights â€” stride=2, 256 channels. No separate learning for each input.", sectionId: "s-siamese" },
+  { x: 2, count: 6, label: "RESIDUAL 512ch", detail: "Same weights â€” stride=2, 512 channels. Both faces processed identically.", sectionId: "s-siamese" },
+  { x: 4, count: 3, label: "GLOBAL AVG POOL", detail: "Same pooling operation â€” 6Ã—6 â†’ 512d. Output vectors are comparable by design.", sectionId: "s-siamese" },
   { x: 6, count: 2, label: "L2-NORM 256d", detail: "Same FC + L2 normalization. Distance between embeddings is now meaningful.", sectionId: "s-siamese" },
 ]
 
 const DISTANCE_LAYER: LayerDef = {
   x: 8, count: 1, label: "DISTANCE",
-  detail: "L2 distance: ‖f(x₁) - f(x₂)‖₂. Near zero = same person. Near 2 = different. Threshold ≈ 0.5.",
+  detail: "L2 distance: â€–f(xâ‚) - f(xâ‚‚)â€–â‚‚. Near zero = same person. Near 2 = different. Threshold â‰ˆ 0.5.",
   sectionId: "s-contrastive",
   isDistance: true,
 }
@@ -372,7 +372,7 @@ export function NeuralDeepViz() {
     <div className="relative w-full">
       {/* Title badge */}
       <div className="flex items-center justify-center gap-3 mb-4">
-        <span className="px-3 py-1 rounded-full bg-[--ollie-cyan]/10 border border-[--ollie-cyan]/30 text-[--ollie-cyan] text-xs font-bold tracking-widest uppercase">
+        <span className="px-3 py-1 rounded-full bg-(--ollie-cyan)/10 border border-(--ollie-cyan)/30 text-(--ollie-cyan) text-xs font-bold tracking-widest uppercase">
           Interactive Network
         </span>
       </div>
@@ -387,23 +387,23 @@ export function NeuralDeepViz() {
       {/* Tooltip overlay */}
       {tooltip && (
         <div
-          className="absolute z-20 bg-black/95 border border-[--ollie-cyan]/20 rounded-2xl px-4 py-3 max-w-[260px] shadow-2xl"
+          className="absolute z-20 bg-black/95 border border-(--ollie-cyan)/20 rounded-2xl px-4 py-3 max-w-[260px] shadow-2xl"
           style={{
             left: Math.min(tooltip.screenX + 16, (canvasRef.current?.clientWidth ?? 800) - 280),
             top: Math.max(tooltip.screenY - 70, 10),
             pointerEvents: 'auto',
           }}
         >
-          <div className="text-[--ollie-cyan] text-[10px] font-bold tracking-widest uppercase mb-1.5">
+          <div className="text-(--ollie-cyan) text-[10px] font-bold tracking-widest uppercase mb-1.5">
             {tooltip.label}
           </div>
           <div className="text-white/60 text-xs leading-relaxed mb-3">{tooltip.detail}</div>
           {tooltip.sectionId && (
             <a
               href={`#${tooltip.sectionId}`}
-              className="inline-flex items-center gap-1.5 text-[10px] font-bold text-[--ollie-cyan] hover:text-white transition-colors bg-[--ollie-cyan]/10 hover:bg-[--ollie-cyan]/20 border border-[--ollie-cyan]/30 rounded-lg px-2.5 py-1.5"
+              className="inline-flex items-center gap-1.5 text-[10px] font-bold text-(--ollie-cyan) hover:text-white transition-colors bg-(--ollie-cyan)/10 hover:bg-(--ollie-cyan)/20 border border-(--ollie-cyan)/30 rounded-lg px-2.5 py-1.5"
             >
-              View full explanation →
+              View full explanation â†’
             </a>
           )}
         </div>
@@ -411,7 +411,7 @@ export function NeuralDeepViz() {
 
       {/* Controls hint */}
       <p className="text-center text-white/25 text-xs mt-4 tracking-wide">
-        Drag to orbit · Scroll to zoom · Hover a node for details
+        Drag to orbit Â· Scroll to zoom Â· Hover a node for details
       </p>
     </div>
   )
