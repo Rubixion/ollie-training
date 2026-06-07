@@ -11,7 +11,7 @@ export const metadata = {
 export default function FindPage() {
   return (
     <main className="relative min-h-screen bg-transparent">
-      <BGPattern variant="grid" mask="fade-edges" fill="rgba(0,212,255,0.05)" size={32} className="fixed" />
+      <BGPattern variant="grid" mask="fade-edges" fill="rgba(255,255,255,0.04)" size={32} className="fixed" />
       <Nav />
       <div className="pt-24">
         <CelebrityFinder />

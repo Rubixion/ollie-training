@@ -11,7 +11,7 @@ export const metadata = {
 export default function FeedbackPage() {
   return (
     <main className="relative min-h-screen bg-transparent">
-      <BGPattern variant="dots" mask="fade-edges" fill="rgba(0,212,255,0.08)" size={24} className="fixed" />
+      <BGPattern variant="dots" mask="fade-edges" fill="rgba(255,255,255,0.05)" size={24} className="fixed" />
       <Nav />
       <div className="pt-24">
         <FeedbackSection />

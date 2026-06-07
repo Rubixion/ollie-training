@@ -38,7 +38,7 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 		for (let ix = 0; ix < AMOUNTX; ix++) {
 			for (let iy = 0; iy < AMOUNTY; iy++) {
 				positions.push(ix * SEPARATION - (AMOUNTX * SEPARATION) / 2, 0, iy * SEPARATION - (AMOUNTY * SEPARATION) / 2);
-				if (theme === 'dark') { colors.push(0.75, 0.75, 0.75); } else { colors.push(0.15, 0.15, 0.15); }
+				if (theme === 'dark') { colors.push(0.392, 0.510, 0.824); } else { colors.push(0.15, 0.15, 0.15); }
 			}
 		}
 		geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));

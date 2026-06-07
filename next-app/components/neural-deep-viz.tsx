@@ -1,13 +1,15 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
+import { X, ArrowDown } from "lucide-react"
 
 interface LayerDef {
   x: number
   count: number
   label: string
+  simple: string
   detail: string
   sectionId?: string
   isInput?: boolean
@@ -15,33 +17,103 @@ interface LayerDef {
 }
 
 const TOP_LAYERS: LayerDef[] = [
-  { x: -6, count: 1, label: "INPUT IMAGE", detail: "96Ã—96Ã—3 RGB face image. Normalized to [-1,1] range. Each pixel becomes a floating-point value.", sectionId: "s-backbone", isInput: true },
-  { x: -4, count: 4, label: "CONV 3Ã—3", detail: "64 channels, 3Ã—3 convolutions with BatchNorm + ReLU. Detects low-level edges and textures.", sectionId: "s-backbone" },
-  { x: -2, count: 4, label: "RESIDUAL 128ch", detail: "ResBlock: stride=2, 128 channels. Skip connection via 1Ã—1 projection prevents vanishing gradients.", sectionId: "s-backbone" },
-  { x: 0, count: 6, label: "RESIDUAL 256ch", detail: "ResBlock: stride=2, 256 channels. Feature map shrinks to 24Ã—24. Learns mid-level facial structure.", sectionId: "s-backbone" },
-  { x: 2, count: 6, label: "RESIDUAL 512ch", detail: "ResBlock: stride=2, 512 channels. Feature map: 12Ã—12. High-level identity features emerge here.", sectionId: "s-backbone" },
-  { x: 4, count: 3, label: "GLOBAL AVG POOL", detail: "6Ã—6 adaptive average pooling collapses spatial dims â†’ 512-d vector. Spatial invariance.", sectionId: "s-backbone" },
-  { x: 6, count: 2, label: "L2-NORM 256d", detail: "FC 512â†’256 + L2 normalization. Projects to unit hypersphere. Enables cosine similarity.", sectionId: "s-siamese" },
+  {
+    x: -6, count: 1, label: "Your photo",
+    simple: "This is your photo — just a grid of colour numbers that the AI reads one small region at a time.",
+    detail: "96x96x3 RGB tensor, pixel values normalised to [-1,1]. Input shape: [1, 3, 96, 96]. Each pixel is a float32 triple.",
+    sectionId: "s-backbone", isInput: true,
+  },
+  {
+    x: -4, count: 4, label: "Edge detector",
+    simple: "The first layer slides a tiny window across your face picking up edges, corners, and colour changes.",
+    detail: "Conv2d(3→64, kernel=3, stride=1, padding=1) + BatchNorm2d + ReLU. Detects low-level gradients. Output: [1, 64, 96, 96].",
+    sectionId: "s-backbone",
+  },
+  {
+    x: -2, count: 4, label: "Shape finder",
+    simple: "A deeper layer that starts assembling edges into shapes — eye corners, nose bridges, jaw lines.",
+    detail: "ResBlock(64→128, stride=2) with 1x1 projection shortcut. Skip connection prevents vanishing gradients. Output: [1, 128, 48, 48].",
+    sectionId: "s-backbone",
+  },
+  {
+    x: 0, count: 6, label: "Feature mapper",
+    simple: "By here the network notices whole facial regions — eye spacing, nose width, forehead height.",
+    detail: "ResBlock(128→256, stride=2). Receptive field ~40px of original image. Mid-level facial structure. Output: [1, 256, 24, 24].",
+    sectionId: "s-backbone",
+  },
+  {
+    x: 2, count: 6, label: "Identity layer",
+    simple: "The deepest layer — it now picks up high-level traits unique to one person, not just any face.",
+    detail: "ResBlock(256→512, stride=2). Receptive field ~80px. High-level identity features emerge. Output: [1, 512, 12, 12].",
+    sectionId: "s-backbone",
+  },
+  {
+    x: 4, count: 3, label: "Summariser",
+    simple: "Compresses everything into a single flat summary — like turning a detailed report into one line.",
+    detail: "Adaptive average pool 12x12 → 1x1. Spatial translation invariance. Output: [1, 512]. No learned parameters.",
+    sectionId: "s-backbone",
+  },
+  {
+    x: 6, count: 2, label: "Face fingerprint",
+    simple: "Your face is now 256 numbers. This is your unique fingerprint — similar faces land close together.",
+    detail: "Linear(512→256) + L2 normalisation. Projects onto unit hypersphere in R^256. ||e||_2 = 1.0 by construction. Cosine distance is equivalent to half squared L2.",
+    sectionId: "s-siamese",
+  },
 ]
 
 const BOTTOM_LAYERS: LayerDef[] = [
-  { x: -6, count: 1, label: "INPUT IMAGE", detail: "Second face â€” Siamese twin input. Both networks share identical weights.", sectionId: "s-siamese", isInput: true },
-  { x: -4, count: 4, label: "CONV 3Ã—3", detail: "Exact same weights as the top network. Weight sharing is what makes it 'Siamese'.", sectionId: "s-siamese" },
-  { x: -2, count: 4, label: "RESIDUAL 128ch", detail: "Same weights â€” stride=2, 128 channels. Ensures both embeddings live in the same space.", sectionId: "s-siamese" },
-  { x: 0, count: 6, label: "RESIDUAL 256ch", detail: "Same weights â€” stride=2, 256 channels. No separate learning for each input.", sectionId: "s-siamese" },
-  { x: 2, count: 6, label: "RESIDUAL 512ch", detail: "Same weights â€” stride=2, 512 channels. Both faces processed identically.", sectionId: "s-siamese" },
-  { x: 4, count: 3, label: "GLOBAL AVG POOL", detail: "Same pooling operation â€” 6Ã—6 â†’ 512d. Output vectors are comparable by design.", sectionId: "s-siamese" },
-  { x: 6, count: 2, label: "L2-NORM 256d", detail: "Same FC + L2 normalization. Distance between embeddings is now meaningful.", sectionId: "s-siamese" },
+  {
+    x: -6, count: 1, label: "Celebrity photo",
+    simple: "A celebrity photo runs through an identical copy of the same network at the same time.",
+    detail: "Second face — Siamese twin input. Same preprocessing pipeline. All weights W and biases b are shared with the top network.",
+    sectionId: "s-siamese", isInput: true,
+  },
+  {
+    x: -4, count: 4, label: "Edge detector",
+    simple: "Same first step — scanning for edges using the same patterns the network already learned.",
+    detail: "Exact same Conv2d weights as the top network. Weight sharing is the defining property of a Siamese architecture.",
+    sectionId: "s-siamese",
+  },
+  {
+    x: -2, count: 4, label: "Shape finder",
+    simple: "Same layer, same learned rules — both faces are measured using identical criteria.",
+    detail: "Same ResBlock(64→128) weights. Ensures both embeddings live in the same geometric space. Any transformation applied to face 1 applies equally to face 2.",
+    sectionId: "s-siamese",
+  },
+  {
+    x: 0, count: 6, label: "Feature mapper",
+    simple: "The second face's regions are mapped out using the exact same rules as the first face.",
+    detail: "Same ResBlock(128→256) weights. No separate learning path for input 2. Symmetry enforced by architecture, not training.",
+    sectionId: "s-siamese",
+  },
+  {
+    x: 2, count: 6, label: "Identity layer",
+    simple: "High-level identity features of the celebrity face come out here, measured identically to yours.",
+    detail: "Same ResBlock(256→512) weights. Both faces processed through identical computational graph. Shared gradient flow during training.",
+    sectionId: "s-siamese",
+  },
+  {
+    x: 4, count: 3, label: "Summariser",
+    simple: "Same compression step — the celebrity face becomes a single summary ready to compare with yours.",
+    detail: "Same adaptive average pool 12x12 → 1x1. Output vectors are directly comparable because the same transformation was applied.",
+    sectionId: "s-siamese",
+  },
+  {
+    x: 6, count: 2, label: "Face fingerprint",
+    simple: "The celebrity gets their 256-number fingerprint. Now both fingerprints are in the same space.",
+    detail: "Same Linear(512→256) + L2 normalisation. Distance between unit vectors is geometrically meaningful — cos(e1,e2) = 1 - d^2/2.",
+    sectionId: "s-siamese",
+  },
 ]
 
 const DISTANCE_LAYER: LayerDef = {
-  x: 8, count: 1, label: "DISTANCE",
-  detail: "L2 distance: â€–f(xâ‚) - f(xâ‚‚)â€–â‚‚. Near zero = same person. Near 2 = different. Threshold â‰ˆ 0.5.",
+  x: 8.5, count: 1, label: "Similarity score",
+  simple: "The gap between the two fingerprints — small gap means the same person, large gap means different people.",
+  detail: "L2 distance ||f(x1) - f(x2)||_2, range [0,2] on unit sphere. Threshold ~0.5. BCE head: sigmoid(|e1-e2| * W + b) -> similarity in [0,1].",
   sectionId: "s-contrastive",
   isDistance: true,
 }
 
-// Generate Y positions for nodes in a layer
 function nodeYPositions(count: number, spacing = 0.5): number[] {
   const total = (count - 1) * spacing
   return Array.from({ length: count }, (_, i) => i * spacing - total / 2)
@@ -49,6 +121,7 @@ function nodeYPositions(count: number, spacing = 0.5): number[] {
 
 interface HoveredNode {
   label: string
+  simple: string
   detail: string
   sectionId?: string
   screenX: number
@@ -56,10 +129,10 @@ interface HoveredNode {
 }
 
 export function NeuralDeepViz() {
-  const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const tooltipRef = useRef<HoveredNode | null>(null)
   const [tooltip, setTooltip] = useState<HoveredNode | null>(null)
+  const [devModal, setDevModal] = useState<{ label: string; detail: string } | null>(null)
   const rafRef = useRef<number | undefined>(undefined)
   const sceneDataRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -70,46 +143,40 @@ export function NeuralDeepViz() {
     signalParticles: THREE.Mesh[]
     signalProgress: number[]
     signalPaths: Array<{ start: THREE.Vector3; end: THREE.Vector3 }>
+    signalWobble: Array<{ px: number; py: number; amp: number; freq: number; phase: number; tMin: number; tMax: number }>
     raycaster: THREE.Raycaster
     mouse: THREE.Vector2
   } | null>(null)
 
   const buildScene = useCallback(() => {
     if (!canvasRef.current) return
-
     const W = canvasRef.current.clientWidth
     const H = canvasRef.current.clientHeight
 
-    // Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(W, H)
     renderer.setClearColor(0x000000, 0)
     canvasRef.current.appendChild(renderer.domElement)
 
-    // Scene
     const scene = new THREE.Scene()
     scene.fog = new THREE.Fog(0x000000, 20, 60)
 
-    // Camera
     const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 200)
     camera.position.set(0, 2, 16)
     camera.lookAt(0, -0.5, 0)
 
-    // Lights
-    const ambient = new THREE.AmbientLight(0xffffff, 0.4)
-    scene.add(ambient)
-    const pointLight1 = new THREE.PointLight(0x00d4ff, 2, 30)
-    pointLight1.position.set(-6, 3, 5)
-    scene.add(pointLight1)
-    const pointLight2 = new THREE.PointLight(0x8b5cf6, 2, 30)
-    pointLight2.position.set(6, -3, 5)
-    scene.add(pointLight2)
-    const distLight = new THREE.PointLight(0xff6b35, 3, 15)
-    distLight.position.set(8, -1.5, 3)
+    scene.add(new THREE.AmbientLight(0xffffff, 0.3))
+    const topLight = new THREE.PointLight(0x6482D2, 4, 28)
+    topLight.position.set(-3, 6, 6)
+    scene.add(topLight)
+    const bottomLight = new THREE.PointLight(0xA07EC8, 4, 28)
+    bottomLight.position.set(-3, -6, 6)
+    scene.add(bottomLight)
+    const distLight = new THREE.PointLight(0xD4A050, 5, 18)
+    distLight.position.set(9, 0, 4)
     scene.add(distLight)
 
-    // Controls
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
     controls.dampingFactor = 0.08
@@ -118,24 +185,18 @@ export function NeuralDeepViz() {
     controls.target.set(1, -1.5, 0)
     controls.update()
 
-    // Helper to create nodes for one network row
     const nodeMeshes: Array<{ mesh: THREE.Mesh; layer: LayerDef }> = []
 
-    function buildNetworkRow(
-      layers: LayerDef[],
-      yOffset: number,
-      colorHex: number,
-      emissiveHex: number
-    ) {
+    function buildNetworkRow(layers: LayerDef[], yOffset: number, nodeColor: number, emissiveColor: number) {
       for (const layer of layers) {
         const yPositions = nodeYPositions(layer.count, 0.55)
         for (const yLocal of yPositions) {
-          const radius = layer.isInput ? 0.38 : layer.isDistance ? 0.38 : 0.14
+          const radius = layer.isInput ? 0.38 : layer.isDistance ? 0.42 : 0.14
           const geo = new THREE.SphereGeometry(radius, 16, 16)
           const mat = new THREE.MeshStandardMaterial({
-            color: layer.isInput ? 0xffffff : layer.isDistance ? 0xff6b35 : colorHex,
-            emissive: layer.isInput ? 0xaaaaaa : layer.isDistance ? 0xff3300 : emissiveHex,
-            emissiveIntensity: layer.isInput ? 0.6 : layer.isDistance ? 0.8 : 0.3,
+            color: nodeColor,
+            emissive: emissiveColor,
+            emissiveIntensity: layer.isInput ? 0.8 : layer.isDistance ? 1.0 : 0.3,
             roughness: 0.2,
             metalness: 0.5,
           })
@@ -147,20 +208,11 @@ export function NeuralDeepViz() {
       }
     }
 
-    buildNetworkRow(TOP_LAYERS, 1.75, 0x00d4ff, 0x007799)
-    buildNetworkRow(BOTTOM_LAYERS, -1.75, 0x8b5cf6, 0x4c1d95)
-    buildNetworkRow([DISTANCE_LAYER], -0.0, 0xff6b35, 0x882200)
+    buildNetworkRow(TOP_LAYERS, 1.75, 0x6482D2, 0x2A3A72)
+    buildNetworkRow(BOTTOM_LAYERS, -1.75, 0xA07EC8, 0x4A2870)
+    buildNetworkRow([DISTANCE_LAYER], 0, 0xD4A050, 0x705020)
 
-    // Add input glow point lights
-    const inputGlow1 = new THREE.PointLight(0xffffff, 1.5, 4)
-    inputGlow1.position.set(-6, 1.75, 0)
-    scene.add(inputGlow1)
-    const inputGlow2 = new THREE.PointLight(0xffffff, 1.5, 4)
-    inputGlow2.position.set(-6, -1.75, 0)
-    scene.add(inputGlow2)
-
-    // Connections (lines between adjacent layers)
-    function buildConnections(layers: LayerDef[], yOffset: number) {
+    function buildConnections(layers: LayerDef[], yOffset: number, lineColor: number) {
       for (let li = 0; li < layers.length - 1; li++) {
         const fromLayer = layers[li]
         const toLayer = layers[li + 1]
@@ -176,15 +228,14 @@ export function NeuralDeepViz() {
           }
         }
         const geo = new THREE.BufferGeometry().setFromPoints(points)
-        const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.06 })
+        const mat = new THREE.LineBasicMaterial({ color: lineColor, transparent: true, opacity: 0.10 })
         scene.add(new THREE.LineSegments(geo, mat))
       }
     }
 
-    buildConnections(TOP_LAYERS, 1.75)
-    buildConnections(BOTTOM_LAYERS, -1.75)
+    buildConnections(TOP_LAYERS, 1.75, 0x6482D2)
+    buildConnections(BOTTOM_LAYERS, -1.75, 0xA07EC8)
 
-    // Connect last top layer to distance node
     function connectToDistance(lastLayer: LayerDef, yOffset: number) {
       const fromYs = nodeYPositions(lastLayer.count, 0.55)
       const points: THREE.Vector3[] = []
@@ -195,22 +246,19 @@ export function NeuralDeepViz() {
         )
       }
       const geo = new THREE.BufferGeometry().setFromPoints(points)
-      const mat = new THREE.LineBasicMaterial({ color: 0xff6b35, transparent: true, opacity: 0.15 })
+      const mat = new THREE.LineBasicMaterial({ color: 0xD4A050, transparent: true, opacity: 0.18 })
       scene.add(new THREE.LineSegments(geo, mat))
     }
 
     connectToDistance(TOP_LAYERS[TOP_LAYERS.length - 1], 1.75)
     connectToDistance(BOTTOM_LAYERS[BOTTOM_LAYERS.length - 1], -1.75)
 
-    // Signal particles
-    function buildSignalPaths(layers: LayerDef[], yOffset: number): Array<{ start: THREE.Vector3; end: THREE.Vector3 }> {
+    function buildSignalPaths(layers: LayerDef[], yOffset: number) {
       const paths: Array<{ start: THREE.Vector3; end: THREE.Vector3 }> = []
       for (let li = 0; li < layers.length - 1; li++) {
-        const fromLayer = layers[li]
-        const toLayer = layers[li + 1]
         paths.push({
-          start: new THREE.Vector3(fromLayer.x, yOffset, 0),
-          end: new THREE.Vector3(toLayer.x, yOffset, 0),
+          start: new THREE.Vector3(layers[li].x, yOffset, 0),
+          end: new THREE.Vector3(layers[li + 1].x, yOffset, 0),
         })
       }
       return paths
@@ -218,93 +266,142 @@ export function NeuralDeepViz() {
 
     const topPaths = buildSignalPaths(TOP_LAYERS, 1.75)
     const bottomPaths = buildSignalPaths(BOTTOM_LAYERS, -1.75)
-    const distancePath = {
+    const distPathTop = {
       start: new THREE.Vector3(TOP_LAYERS[TOP_LAYERS.length - 1].x, 1.75, 0),
       end: new THREE.Vector3(DISTANCE_LAYER.x, 0, 0),
     }
-    const signalPaths = [...topPaths, ...bottomPaths, distancePath]
+    const distPathBottom = {
+      start: new THREE.Vector3(BOTTOM_LAYERS[BOTTOM_LAYERS.length - 1].x, -1.75, 0),
+      end: new THREE.Vector3(DISTANCE_LAYER.x, 0, 0),
+    }
+    const signalPaths = [...topPaths, ...bottomPaths, distPathTop, distPathBottom]
 
     const signalParticles: THREE.Mesh[] = []
     const signalProgress: number[] = []
+    const signalWobble: Array<{ px: number; py: number; amp: number; freq: number; phase: number }> = []
+
+    const topCount = topPaths.length
+    const bottomCount = bottomPaths.length
 
     for (let i = 0; i < signalPaths.length; i++) {
-      const geo = new THREE.SphereGeometry(0.06, 8, 8)
-      const isTop = i < topPaths.length
+      const isTop = i < topCount
+      const isBottom = i >= topCount && i < topCount + bottomCount
+      const isDist = i >= topCount + bottomCount
+      const partColor = isTop ? 0x8AAAE8 : isBottom ? 0xC09AE8 : 0xE8C070
+      const partEmissive = isTop ? 0x6482D2 : isBottom ? 0xA07EC8 : 0xD4A050
+
+      const geo = new THREE.SphereGeometry(0.07, 8, 8)
       const mat = new THREE.MeshStandardMaterial({
-        color: isTop ? 0x00ffff : 0xcc99ff,
-        emissive: isTop ? 0x00aaaa : 0x6633cc,
-        emissiveIntensity: 1,
+        color: partColor,
+        emissive: partEmissive,
+        emissiveIntensity: 1.8,
+        transparent: true,
+        opacity: 0,
       })
       const mesh = new THREE.Mesh(geo, mat)
       scene.add(mesh)
       signalParticles.push(mesh)
-      signalProgress.push(Math.random()) // stagger starts
+      signalProgress.push(0.2 + Math.random() * 0.6)
+
+      const path = signalPaths[i]
+      const pathLen = path.start.distanceTo(path.end)
+      const dir = new THREE.Vector3().subVectors(path.end, path.start).normalize()
+
+      // Sphere radii at each end — determines how far into the path the particle stays hidden
+      let rStart = 0.14
+      let rEnd = 0.14
+      if (isTop) {
+        const li = i
+        if (TOP_LAYERS[li].isInput) rStart = 0.38
+        if (TOP_LAYERS[li + 1]?.isDistance) rEnd = 0.42
+      } else if (isBottom) {
+        const li = i - topCount
+        if (BOTTOM_LAYERS[li].isInput) rStart = 0.38
+        if (BOTTOM_LAYERS[li + 1]?.isDistance) rEnd = 0.42
+      } else {
+        // dist paths: regular start → large distance node
+        rStart = 0.14
+        rEnd = 0.42
+      }
+
+      const tMin = Math.min(rStart / pathLen, 0.4)
+      const tMax = Math.max(1 - rEnd / pathLen, 0.6)
+
+      signalWobble.push({
+        px: -dir.y,
+        py: dir.x,
+        amp: isDist ? 0 : 0.22 + Math.random() * 0.18,
+        freq: isDist ? 1 : 2 + Math.random() * 2,
+        phase: Math.random() * Math.PI * 2,
+        tMin,
+        tMax,
+      })
     }
 
-    // Raycaster
     const raycaster = new THREE.Raycaster()
     const mouse = new THREE.Vector2()
 
-    sceneDataRef.current = {
-      renderer,
-      scene,
-      camera,
-      controls,
-      nodeMeshes,
-      signalParticles,
-      signalProgress,
-      signalPaths,
-      raycaster,
-      mouse,
-    }
+    sceneDataRef.current = { renderer, scene, camera, controls, nodeMeshes, signalParticles, signalProgress, signalPaths, signalWobble, raycaster, mouse }
   }, [])
 
   const animate = useCallback(() => {
     const data = sceneDataRef.current
     if (!data) return
-
     data.controls.update()
 
-    // Move signal particles along paths
     for (let i = 0; i < data.signalParticles.length; i++) {
-      data.signalProgress[i] += 0.008
+      data.signalProgress[i] += 0.006
       if (data.signalProgress[i] > 1) data.signalProgress[i] = 0
 
       const t = data.signalProgress[i]
       const path = data.signalPaths[i]
-      data.signalParticles[i].position.lerpVectors(path.start, path.end, t)
+      const w = data.signalWobble[i]
+      const mat = data.signalParticles[i].material as THREE.MeshStandardMaterial
+
+      if (t < w.tMin || t > w.tMax) {
+        // outside sphere-safe zone — park off-scene
+        mat.opacity = 0
+        data.signalParticles[i].position.set(9999, 9999, 9999)
+      } else {
+        // remap t to [0,1] within the visible corridor for a clean fade in/out
+        const tNorm = (t - w.tMin) / (w.tMax - w.tMin)
+        const raw = Math.sin(tNorm * Math.PI)
+        const envelope = raw * raw * raw
+        mat.opacity = envelope * 0.95
+        const wobble = Math.sin(t * Math.PI * w.freq + w.phase) * w.amp * envelope
+        const base = new THREE.Vector3().lerpVectors(path.start, path.end, t)
+        data.signalParticles[i].position.set(
+          base.x + w.px * wobble,
+          base.y + w.py * wobble,
+          base.z
+        )
+      }
     }
 
-    // Raycasting for hover
     data.raycaster.setFromCamera(data.mouse, data.camera)
-    const meshOnly = data.nodeMeshes.map((n) => n.mesh)
-    const intersects = data.raycaster.intersectObjects(meshOnly)
+    const intersects = data.raycaster.intersectObjects(data.nodeMeshes.map((n) => n.mesh))
 
     if (intersects.length > 0) {
       const hit = intersects[0].object as THREE.Mesh
       const nodeData = data.nodeMeshes.find((n) => n.mesh === hit)
       if (nodeData) {
-        // Project 3D position to screen
-        const pos = nodeData.mesh.position.clone()
-        pos.project(data.camera)
+        const pos = nodeData.mesh.position.clone().project(data.camera)
         const canvas = canvasRef.current
         if (canvas) {
           const rect = canvas.getBoundingClientRect()
           const screenX = ((pos.x + 1) / 2) * rect.width
           const screenY = ((-pos.y + 1) / 2) * rect.height
-          const newTooltip = {
+          const next: HoveredNode = {
             label: nodeData.layer.label,
+            simple: nodeData.layer.simple,
             detail: nodeData.layer.detail,
             sectionId: nodeData.layer.sectionId,
             screenX,
             screenY,
           }
-          if (
-            !tooltipRef.current ||
-            tooltipRef.current.label !== newTooltip.label
-          ) {
-            tooltipRef.current = newTooltip
-            setTooltip(newTooltip)
+          if (!tooltipRef.current || tooltipRef.current.label !== next.label) {
+            tooltipRef.current = next
+            setTooltip(next)
           }
         }
       }
@@ -331,21 +428,17 @@ export function NeuralDeepViz() {
     const data = sceneDataRef.current
     const canvas = canvasRef.current
     if (!data || !canvas) return
-    const W = canvas.clientWidth
-    const H = canvas.clientHeight
-    data.camera.aspect = W / H
+    data.camera.aspect = canvas.clientWidth / canvas.clientHeight
     data.camera.updateProjectionMatrix()
-    data.renderer.setSize(W, H)
+    data.renderer.setSize(canvas.clientWidth, canvas.clientHeight)
   }, [])
 
   useEffect(() => {
     buildScene()
     rafRef.current = requestAnimationFrame(animate)
-
     window.addEventListener("resize", handleResize)
     const canvas = canvasRef.current
     if (canvas) canvas.addEventListener("mousemove", handleMouseMove)
-
     return () => {
       window.removeEventListener("resize", handleResize)
       if (canvas) canvas.removeEventListener("mousemove", handleMouseMove)
@@ -370,49 +463,80 @@ export function NeuralDeepViz() {
 
   return (
     <div className="relative w-full">
-      {/* Title badge */}
-      <div className="flex items-center justify-center gap-3 mb-4">
-        <span className="px-3 py-1 rounded-full bg-(--ollie-cyan)/10 border border-(--ollie-cyan)/30 text-(--ollie-cyan) text-xs font-bold tracking-widest uppercase">
-          Interactive Network
-        </span>
-      </div>
-
-      {/* Canvas container */}
+      {/* Canvas */}
       <div
         ref={canvasRef}
         className="w-full rounded-2xl overflow-hidden border border-white/10 bg-black/60"
         style={{ height: "70vh" }}
       />
 
-      {/* Tooltip overlay */}
+      {/* Tooltip */}
       {tooltip && (
         <div
-          className="absolute z-20 bg-black/95 border border-(--ollie-cyan)/20 rounded-2xl px-4 py-3 max-w-[260px] shadow-2xl"
+          className="absolute z-20 bg-[#0a0a0a] border border-white/12 rounded-2xl p-4 max-w-[260px] shadow-2xl"
           style={{
             left: Math.min(tooltip.screenX + 16, (canvasRef.current?.clientWidth ?? 800) - 280),
-            top: Math.max(tooltip.screenY - 70, 10),
-            pointerEvents: 'auto',
+            top: Math.max(tooltip.screenY - 80, 10),
+            pointerEvents: "auto",
           }}
         >
-          <div className="text-(--ollie-cyan) text-[10px] font-bold tracking-widest uppercase mb-1.5">
+          <div className="text-white/40 text-[9px] font-bold tracking-widest uppercase mb-1.5">
             {tooltip.label}
           </div>
-          <div className="text-white/60 text-xs leading-relaxed mb-3">{tooltip.detail}</div>
-          {tooltip.sectionId && (
-            <a
-              href={`#${tooltip.sectionId}`}
-              className="inline-flex items-center gap-1.5 text-[10px] font-bold text-(--ollie-cyan) hover:text-white transition-colors bg-(--ollie-cyan)/10 hover:bg-(--ollie-cyan)/20 border border-(--ollie-cyan)/30 rounded-lg px-2.5 py-1.5"
+          <p className="text-white/75 text-xs leading-relaxed mb-3">
+            {tooltip.simple}
+          </p>
+          <div className="flex gap-2">
+            {tooltip.sectionId && (
+              <a
+                href={`#${tooltip.sectionId}`}
+                className="inline-flex items-center gap-1 text-[10px] font-semibold text-white/50 hover:text-white border border-white/15 hover:border-white/30 rounded-lg px-2.5 py-1.5 transition-colors"
+              >
+                <ArrowDown size={10} />
+                Full explanation
+              </a>
+            )}
+            <button
+              onClick={() => setDevModal({ label: tooltip.label, detail: tooltip.detail })}
+              className="inline-flex items-center gap-1 text-[10px] font-semibold text-white/30 hover:text-white/60 border border-white/8 hover:border-white/20 rounded-lg px-2.5 py-1.5 transition-colors"
             >
-              View full explanation â†’
-            </a>
-          )}
+              For the devs
+            </button>
+          </div>
         </div>
       )}
 
       {/* Controls hint */}
-      <p className="text-center text-white/25 text-xs mt-4 tracking-wide">
-        Drag to orbit Â· Scroll to zoom Â· Hover a node for details
+      <p className="text-center text-white/20 text-xs mt-4 tracking-wide">
+        Drag to orbit &middot; Scroll to zoom &middot; Hover a node for details
       </p>
+
+      {/* Dev modal */}
+      {devModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-6"
+          onClick={() => setDevModal(null)}
+        >
+          <div
+            className="relative bg-[#0d0d0d] border border-white/12 rounded-2xl p-7 max-w-lg w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setDevModal(null)}
+              className="absolute top-4 right-4 text-white/30 hover:text-white/70 transition-colors"
+            >
+              <X size={16} />
+            </button>
+            <div className="text-white/35 text-[9px] font-bold tracking-widest uppercase mb-1">
+              For the devs
+            </div>
+            <div className="text-white font-bold text-base mb-4">{devModal.label}</div>
+            <pre className="text-white/55 text-xs font-mono leading-relaxed whitespace-pre-wrap break-words">
+              {devModal.detail}
+            </pre>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

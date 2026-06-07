@@ -53,7 +53,7 @@ export default function Page() {
           >
             <Link
               href="/find"
-              className="group flex items-center gap-2 px-8 py-4 rounded-full bg-(--ollie-cyan) text-black font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-(--ollie-glow) active:scale-[0.98]"
+              className="group flex items-center gap-2 px-8 py-4 rounded-full bg-(--ollie-cyan) text-white font-bold text-sm hover:opacity-90 transition-all active:scale-[0.98]"
             >
               Find Your Lookalike
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
@@ -126,7 +126,7 @@ export default function Page() {
 
             <Link
               href="/find"
-              className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-(--ollie-cyan) text-black font-bold text-sm hover:opacity-90 transition-all"
+              className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-(--ollie-cyan) text-white font-bold text-sm hover:opacity-90 transition-all"
             >
               Try it now
               <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform" />
@@ -150,7 +150,7 @@ export default function Page() {
               { label: "Improves over time", desc: "The AI learns from user feedback after each search" },
             ].map(({ label, desc }) => (
               <div key={label} className="p-5 rounded-2xl bg-white/[0.03] border border-white/8 flex flex-col gap-2">
-                <CheckCircle size={15} className="text-(--ollie-cyan)" />
+                <CheckCircle size={15} className="text-sky-400" />
                 <div className="text-white font-semibold text-sm">{label}</div>
                 <div className="text-white/40 text-xs leading-relaxed">{desc}</div>
               </div>
@@ -170,7 +170,7 @@ export default function Page() {
           className="text-center mb-16"
         >
           <SectionLabel>The AI</SectionLabel>
-          <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-5">
+          <h2 className="text-4xl md:text-5xl font-black text-white/80 tracking-tight mb-5">
             Custom-built face recognition
           </h2>
           <p className="text-white/45 text-base leading-relaxed max-w-2xl mx-auto">
@@ -329,7 +329,7 @@ export default function Page() {
               </p>
               <Link
                 href="/feedback"
-                className="group inline-flex items-center gap-2 px-6 py-3 rounded-full bg-(--ollie-cyan) text-black font-bold text-sm hover:opacity-90 transition-all"
+                className="group inline-flex items-center gap-2 px-6 py-3 rounded-full bg-(--ollie-cyan) text-white font-bold text-sm hover:opacity-90 transition-all"
               >
                 Submit feedback
                 <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />

@@ -11,7 +11,7 @@ export const metadata = {
 export default function FindPersonPage() {
   return (
     <main className="relative min-h-screen bg-transparent">
-      <BGPattern variant="diagonal-stripes" mask="fade-edges" fill="rgba(139,92,246,0.07)" size={28} className="fixed" />
+      <BGPattern variant="diagonal-stripes" mask="fade-edges" fill="rgba(255,255,255,0.04)" size={28} className="fixed" />
       <Nav />
       <div className="pt-24">
         <FindPerson />

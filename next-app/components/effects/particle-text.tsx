@@ -65,7 +65,7 @@ export function ParticleTextEffect({ words = ["OLLIE"] }: ParticleTextEffectProp
     offCtx.textAlign = "center"; offCtx.textBaseline = "middle"
     offCtx.fillText(word, canvas.width / 2, canvas.height / 2)
     const imageData = offCtx.getImageData(0, 0, canvas.width, canvas.height); const pixels = imageData.data
-    const newColor = { r: 230, g: 230, b: 235 }
+    const newColor = { r: 100, g: 130, b: 210 }
     const particles = particlesRef.current; let particleIndex = 0
     const coordsIndexes: number[] = []
     for (let i = 0; i < pixels.length; i += pixelSteps * 4) coordsIndexes.push(i)
