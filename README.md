@@ -169,6 +169,8 @@ The **Feature re-ranking** (skin tone, hair, face shape) is an explicit override
 
 This repo uses [graphify](https://github.com/safishamsi/graphifyy) to build a knowledge graph of the codebase. The graph lets Claude Code answer questions about architecture, data flow, and relationships without reading every file from scratch.
 
+**Current graph:** 551 nodes · 852 edges · 47 communities — covers the full stack (Python ML backend + Next.js frontend). Last updated 2026-06-07.
+
 ### Build the graph (first time or after big changes)
 
 In Claude Code, type:
@@ -176,49 +178,66 @@ In Claude Code, type:
 /graphify
 ```
 
-This scans all `.py` files, extracts classes/functions/relationships via AST, clusters them into communities, and writes the graph to `graphify-out/`.
-
-It found **13 communities** in this project:
-| Community | What's in it |
-|---|---|
-| Gradio UI App Frontend | `app.py` — all tabs, button handlers, index building |
-| Siamese Training Pipeline | `lfw_pytorch.py` — dataset, training loop, contrastive loss |
-| Celebrity Scraping & Groq | `celebrity_scraper.py` — DuckDuckGo scraper, Groq vision verification |
-| Face Feature Extraction | `face_features.py` — MediaPipe FaceMesh, 24-dim geometric features |
-| ResNet Backbone | `_ResBlock`, `SiameseNet.__init__` — the CNN architecture |
-| LFW Dataset Training | `lfw_train.py` — standalone LFW training script (legacy) |
-| Face Recognition (Legacy) | `face_recognition.py` — original from-scratch recognition |
-| Scratch NN Layers | `siamese_network.py`, `network_layer.py` — manual backprop version |
-| Scratch Activation Functions | `activation_function.py` — Relu, Sigmoid from scratch |
-| Convolutional Layer | `conv_layer.py` — manual conv implementation |
-| CNN Pooling Layer | `pool_layer.py`, `main_cnn.py` — MaxPool from scratch |
-| Flatten Layer & Scaffold | `flatten_layer.py` — from-scratch flatten |
-| Scratch Network Core | `network.py` — from-scratch network container |
-
-### Query the graph in Claude Code
-
-Once the graph is built, you can ask Claude questions using the graph instead of raw file reads:
-
-```
-/graphify query "how does skin tone affect matching"
-/graphify query "what happens when training starts"
-/graphify path "FacePairDataset" "SiameseNet"
-/graphify explain "contrastive loss"
-```
-
-This returns a scoped subgraph — much faster and cheaper than reading files one by one.
-
-### Update the graph after code changes
+### Update after code changes (fast, no API cost)
 
 ```
 /graphify . --update
 ```
 
-This re-extracts only changed files (AST-only, free — no API cost).
+Re-extracts only changed files via AST — free and takes a few seconds.
 
-### Why this matters
+### Query the graph
 
-When you open a new Claude Code session, Claude has no memory of previous conversations. Running `/graphify` gives it an instant map of the entire codebase — every class, function, and relationship — so it can make accurate changes without re-reading everything from scratch.
+```
+/graphify query "how does skin tone affect matching"
+/graphify query "what happens when training starts"
+/graphify query "how do blog posts link to the match page"
+/graphify path "FacePairDataset" "SiameseNet"
+/graphify explain "contrastive loss"
+```
+
+Returns a scoped subgraph — much faster than reading files one by one.
+
+### Community map (47 communities)
+
+**Python ML backend**
+| Community | What's in it |
+|---|---|
+| Training Pipeline | `lfw_pytorch.py` — FacePairDataset, training loop, contrastive loss |
+| Siamese Network Architecture | `lfw_pytorch.py` — ResBlock, SiameseNet, get_embedding |
+| FAISS Search & Embeddings | `app.py` — build_faiss, build_embed_index, find_matches |
+| Face Feature Extraction | `face_features.py` — InsightFace GPU / MediaPipe CPU, 32-dim vector |
+| Gradio App & Dataset | `app.py` — all 4 tabs, feedback loop, dataset management |
+| Celebrity Scraper Pipeline | `celebrity_scraper.py` — DuckDuckGo scraper, Groq llama-4-scout verify |
+| VGGFace2 Data Pipeline | `app.py` — kagglehub download, vgg_root management |
+| LFW Evaluation | `lfw_train.py` — standalone evaluation script |
+| Face Recognition Baseline | `face_recognition.py` — original from-scratch version |
+| Neural Network Layers | `activation_function.py`, `conv_layer.py`, `network.py` — manual backprop |
+
+**Next.js frontend (`next-app/`)**
+| Community | What's in it |
+|---|---|
+| AI Explainer Page | `app/ai/page.tsx` — NeuralDeepViz, 8 sections (01–08 incl. blog links) |
+| Blog Post Dynamic Route | `app/blog/[slug]/page.tsx` — SEO metadata, JSON-LD, CTAs to /match + /ai |
+| Blog Infrastructure | `app/blog/layout.tsx`, `app/blog/page.tsx` — listing + category filter |
+| Homepage & Navigation | `app/page.tsx`, `components/nav.tsx` |
+| App Layout & Auth | `app/layout.tsx`, `components/auth-modal.tsx`, `auth-provider.tsx` |
+| Auth UI & shadcn Components | `components/sign-in.tsx`, `components/ui/*` — shadcn primitives |
+| WebGL Visual Effects | `components/effects/` — Three.js particles, entropy, face-feature-viz |
+| API Routes | `app/api/search/route.ts`, `app/api/feedback/route.ts` → Gradio port 7860 |
+| Design System | `DESIGN.md` — color tokens, Geist typography, mesh gradient, elevation |
+| 8-Bit UI & Changelog | `components/8bit-team2.tsx`, `components/ui/8bit-*` |
+
+### God nodes (most connected — change carefully)
+
+| Node | Edges | Why it matters |
+|---|---|---|
+| `Nav()` | 19 | Used by every page |
+| `Footer()` | 16 | Used by every page |
+| `extract_face_features()` | 15 | Core of all search + training paths |
+| `_train_worker()` | 14 | Orchestrates the full training loop |
+| `SiameseNet` | 13 | The model architecture itself |
+| `FacePairDataset` | 13 | Dataset used by all training code |
 
 ---
 

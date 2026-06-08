@@ -347,6 +347,58 @@ function ArchitectureScroll() {
           stops jumping around and settles into the best version of itself.
         </p>
       </Section>
+
+      {/* ── 08  Learn more ────────────────────────────────────────────── */}
+      <Section id="s-learnmore" num="08" title="Go deeper in the blog">
+        <p className="text-white/60 text-base leading-relaxed mb-6">
+          These articles expand on each concept above, with more detail on the algorithms and research behind Ollie.
+        </p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            {
+              slug: "siamese-neural-networks-explained",
+              title: "Siamese Networks Explained",
+              desc: "Why Ollie uses two identical networks in parallel, and how shared weights enable similarity learning.",
+            },
+            {
+              slug: "contrastive-loss-explained",
+              title: "Contrastive Loss Explained",
+              desc: "The loss function that teaches the network what facial similarity means at a mathematical level.",
+            },
+            {
+              slug: "vggface2-explained",
+              title: "VGGFace2 Explained",
+              desc: "The training dataset behind Ollie, with 3.3 million images across 9,131 identities.",
+            },
+            {
+              slug: "resnet-face-recognition",
+              title: "ResNet for Face Recognition",
+              desc: "Why residual connections are so effective for deep face recognition networks.",
+            },
+            {
+              slug: "arcface-explained",
+              title: "ArcFace Explained",
+              desc: "The margin-based loss function that achieves state-of-the-art face recognition accuracy.",
+            },
+            {
+              slug: "transfer-learning-explained",
+              title: "Transfer Learning Explained",
+              desc: "How pre-training on millions of faces gives Ollie a head start on new tasks.",
+            },
+          ].map(({ slug, title, desc }) => (
+            <Link
+              key={slug}
+              href={`/blog/${slug}`}
+              className="block p-5 rounded-2xl bg-white/[0.03] border border-white/8 hover:border-white/20 hover:bg-white/[0.04] transition-all group"
+            >
+              <h3 className="text-sm font-bold text-white mb-1.5 group-hover:text-sky-400 transition-colors leading-snug">
+                {title}
+              </h3>
+              <p className="text-white/40 text-xs leading-relaxed">{desc}</p>
+            </Link>
+          ))}
+        </div>
+      </Section>
     </div>
   )
 }

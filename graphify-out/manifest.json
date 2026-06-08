@@ -15,9 +15,9 @@
     "semantic_hash": "1f94abaf05a1843fc4026e194bb28cd5"
   },
   "C:\\Users\\barca\\projects\\neural network learning\\app.py": {
-    "mtime": 1780640321.5741525,
-    "ast_hash": "70f8b6a82e3957f6b1b69eabcdcfaa7a",
-    "semantic_hash": "70f8b6a82e3957f6b1b69eabcdcfaa7a"
+    "mtime": 1780861975.5453968,
+    "ast_hash": "fb7fcc5d20fb00cf80680f5fff6b7e1a",
+    "semantic_hash": "fb7fcc5d20fb00cf80680f5fff6b7e1a"
   },
   "C:\\Users\\barca\\projects\\neural network learning\\celebrity_scraper.py": {
     "mtime": 1780643421.5812843,
@@ -30,9 +30,9 @@
     "semantic_hash": "3019d71e0be40d6bfdf883e909fd47de"
   },
   "C:\\Users\\barca\\projects\\neural network learning\\face_features.py": {
-    "mtime": 1780639694.887494,
-    "ast_hash": "4656a4556a37129889724bfa855643b4",
-    "semantic_hash": "4656a4556a37129889724bfa855643b4"
+    "mtime": 1780712767.5031404,
+    "ast_hash": "7f57291a285369762956e8770d009b4a",
+    "semantic_hash": "7f57291a285369762956e8770d009b4a"
   },
   "C:\\Users\\barca\\projects\\neural network learning\\face_recognition.py": {
     "mtime": 1780619182.4664965,
@@ -45,9 +45,9 @@
     "semantic_hash": "717f331df77c3652d23d8524009f243e"
   },
   "C:\\Users\\barca\\projects\\neural network learning\\lfw_pytorch.py": {
-    "mtime": 1780643415.6408737,
-    "ast_hash": "57e2f0194830b650a89025f0a820f68d",
-    "semantic_hash": "57e2f0194830b650a89025f0a820f68d"
+    "mtime": 1780718008.315019,
+    "ast_hash": "0934310e0e588275bef42c0631e1c5c5",
+    "semantic_hash": "0934310e0e588275bef42c0631e1c5c5"
   },
   "C:\\Users\\barca\\projects\\neural network learning\\lfw_train.py": {
     "mtime": 1780620307.2711596,
@@ -85,8 +85,368 @@
     "semantic_hash": "757e97fe23a431423f6c4060ce3838ce"
   },
   "C:\\Users\\barca\\projects\\neural network learning\\CLAUDE.md": {
-    "mtime": 1780613160.244515,
-    "ast_hash": "8a6643a420fdad6bfb583523bc6cef16",
-    "semantic_hash": "8a6643a420fdad6bfb583523bc6cef16"
+    "mtime": 1780676127.799801,
+    "ast_hash": "4c3d68b92e012074602a22d23fa13b98",
+    "semantic_hash": "4c3d68b92e012074602a22d23fa13b98"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\about\\about-client.tsx": {
+    "mtime": 1780857381.888808,
+    "ast_hash": "9261151ef50c5ba4eb9e93685df624e9",
+    "semantic_hash": "9261151ef50c5ba4eb9e93685df624e9"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\about\\page.tsx": {
+    "mtime": 1780856887.9336996,
+    "ast_hash": "6b8f00592ea758de54061a4c82f30d3a",
+    "semantic_hash": "6b8f00592ea758de54061a4c82f30d3a"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\ai\\page.tsx": {
+    "mtime": 1780877828.9265969,
+    "ast_hash": "4c46971b678b316e9d98aaa287a45c25",
+    "semantic_hash": "4c46971b678b316e9d98aaa287a45c25"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\api\\feedback\\route.ts": {
+    "mtime": 1780861675.3392131,
+    "ast_hash": "fe5f8919d3d1e5252c3037ee1e5b79fb",
+    "semantic_hash": "fe5f8919d3d1e5252c3037ee1e5b79fb"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\api\\search\\route.ts": {
+    "mtime": 1780861666.928121,
+    "ast_hash": "ddcb31ac74dc7a16a6f1f2594c994798",
+    "semantic_hash": "ddcb31ac74dc7a16a6f1f2594c994798"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\blog\\[slug]\\page.tsx": {
+    "mtime": 1780877902.7072296,
+    "ast_hash": "d199bde71e48b6c4b5818fd88e0ce88f",
+    "semantic_hash": "d199bde71e48b6c4b5818fd88e0ce88f"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\blog\\find-your-celebrity-lookalike\\page.tsx": {
+    "mtime": 1780855419.4283848,
+    "ast_hash": "ef05ada8a7246bdf82858c609f734b96",
+    "semantic_hash": "ef05ada8a7246bdf82858c609f734b96"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\blog\\how-face-recognition-works\\page.tsx": {
+    "mtime": 1780821345.4093857,
+    "ast_hash": "98761a0def5e7041c840bb57400c419e",
+    "semantic_hash": "98761a0def5e7041c840bb57400c419e"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\blog\\layout.tsx": {
+    "mtime": 1780877042.4916768,
+    "ast_hash": "60d6f7389979c6d770cf81f4ea92ef4f",
+    "semantic_hash": "60d6f7389979c6d770cf81f4ea92ef4f"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\blog\\page.tsx": {
+    "mtime": 1780877022.6235075,
+    "ast_hash": "668e7f33e388768cb6a62e28b01f69ad",
+    "semantic_hash": "668e7f33e388768cb6a62e28b01f69ad"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\blog\\siamese-neural-networks-explained\\page.tsx": {
+    "mtime": 1780855460.5099523,
+    "ast_hash": "cc07019ba5dd6b07da844445fd3ddb1a",
+    "semantic_hash": "cc07019ba5dd6b07da844445fd3ddb1a"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\contact\\page.tsx": {
+    "mtime": 1780856898.4230888,
+    "ast_hash": "aa46b5bd75755acb29c750507190a5c4",
+    "semantic_hash": "aa46b5bd75755acb29c750507190a5c4"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\feedback\\page.tsx": {
+    "mtime": 1780855859.554533,
+    "ast_hash": "1a161278da3c9e562aa88f13d5157552",
+    "semantic_hash": "1a161278da3c9e562aa88f13d5157552"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\icon.tsx": {
+    "mtime": 1780861613.833026,
+    "ast_hash": "54a726fa38a446ab432264ba3a6dd848",
+    "semantic_hash": "54a726fa38a446ab432264ba3a6dd848"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\info\\page.tsx": {
+    "mtime": 1780861726.2263432,
+    "ast_hash": "fdea13f2e1258c96106a417a89b0af5e",
+    "semantic_hash": "fdea13f2e1258c96106a417a89b0af5e"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\layout.tsx": {
+    "mtime": 1780858991.9528122,
+    "ast_hash": "d8bc06384bef7c5480a2f3184794aeec",
+    "semantic_hash": "d8bc06384bef7c5480a2f3184794aeec"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\match\\page.tsx": {
+    "mtime": 1780877817.832648,
+    "ast_hash": "f5e39e13bc86d2535f9966a6b9551e9a",
+    "semantic_hash": "f5e39e13bc86d2535f9966a6b9551e9a"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\opengraph-image.tsx": {
+    "mtime": 1780861611.3611696,
+    "ast_hash": "213eb35d79418185fc4a325c3ba1829d",
+    "semantic_hash": "213eb35d79418185fc4a325c3ba1829d"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\page.tsx": {
+    "mtime": 1780859400.8702798,
+    "ast_hash": "9baec46c4852d0e1834c525b5e972032",
+    "semantic_hash": "9baec46c4852d0e1834c525b5e972032"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\privacy\\page.tsx": {
+    "mtime": 1780821264.2432916,
+    "ast_hash": "624dfa32782258b3f5c5a951668cbdae",
+    "semantic_hash": "624dfa32782258b3f5c5a951668cbdae"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\robots.ts": {
+    "mtime": 1780821214.9107487,
+    "ast_hash": "76a4037ccb3bbd5c993d83a36c523c6f",
+    "semantic_hash": "76a4037ccb3bbd5c993d83a36c523c6f"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\search\\page.tsx": {
+    "mtime": 1780861708.3052251,
+    "ast_hash": "a16cc93884c9363fdd0ade5d45c4d10d",
+    "semantic_hash": "a16cc93884c9363fdd0ade5d45c4d10d"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\sitemap.ts": {
+    "mtime": 1780877031.41739,
+    "ast_hash": "f77107bca2fbf10209682c5b62f8550c",
+    "semantic_hash": "f77107bca2fbf10209682c5b62f8550c"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\app\\terms\\page.tsx": {
+    "mtime": 1780821280.0040827,
+    "ast_hash": "cc4fff4fd8dc7065bb21eb3fb2d5bb3b",
+    "semantic_hash": "cc4fff4fd8dc7065bb21eb3fb2d5bb3b"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components.json": {
+    "mtime": 1780800970.6281068,
+    "ast_hash": "a0238eb4ceb9341a82b6e3640ca96743",
+    "semantic_hash": "a0238eb4ceb9341a82b6e3640ca96743"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\8bit-team2.tsx": {
+    "mtime": 1780816129.167743,
+    "ast_hash": "7fc792e5b85220c9615e4727cdc8716b",
+    "semantic_hash": "7fc792e5b85220c9615e4727cdc8716b"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\auth-modal.tsx": {
+    "mtime": 1780861706.4157786,
+    "ast_hash": "bc92711964432dd54ef1471549716e32",
+    "semantic_hash": "bc92711964432dd54ef1471549716e32"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\auth-provider.tsx": {
+    "mtime": 1780858784.9620593,
+    "ast_hash": "e65ffff00a8c5a591267821068e12d91",
+    "semantic_hash": "e65ffff00a8c5a591267821068e12d91"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\bg-pattern.tsx": {
+    "mtime": 1780804188.0402563,
+    "ast_hash": "c94dbb1b77a1d51fdbbfb9bc076385a4",
+    "semantic_hash": "c94dbb1b77a1d51fdbbfb9bc076385a4"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\celebrity-finder.tsx": {
+    "mtime": 1780861700.2668145,
+    "ast_hash": "24954148202e4b8197d29aea9abb2e07",
+    "semantic_hash": "24954148202e4b8197d29aea9abb2e07"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\changelog-section.tsx": {
+    "mtime": 1780806589.3896024,
+    "ast_hash": "27dcaff86a0d2c1271c10f240a00e144",
+    "semantic_hash": "27dcaff86a0d2c1271c10f240a00e144"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\dotted-surface.tsx": {
+    "mtime": 1780805051.496127,
+    "ast_hash": "464dcdfe68b4b7af8ec58e0ee108c6ba",
+    "semantic_hash": "464dcdfe68b4b7af8ec58e0ee108c6ba"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\effects\\dotted-surface.tsx": {
+    "mtime": 1780803494.1495533,
+    "ast_hash": "f56d7e05fc01e7b82acdaa82e21d47bb",
+    "semantic_hash": "f56d7e05fc01e7b82acdaa82e21d47bb"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\effects\\entropy.tsx": {
+    "mtime": 1780803508.4044676,
+    "ast_hash": "91c0bbee9226215fc2cb46ac5fd5e738",
+    "semantic_hash": "91c0bbee9226215fc2cb46ac5fd5e738"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\effects\\face-feature-viz.tsx": {
+    "mtime": 1780805122.556049,
+    "ast_hash": "bbc0cd02b474508360f1c97913aaf3c5",
+    "semantic_hash": "bbc0cd02b474508360f1c97913aaf3c5"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\effects\\particle-text.tsx": {
+    "mtime": 1780815224.0300772,
+    "ast_hash": "a6616f7613519bf674c45deb833b8ac8",
+    "semantic_hash": "a6616f7613519bf674c45deb833b8ac8"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\faq-section.tsx": {
+    "mtime": 1780820434.0279894,
+    "ast_hash": "072848b3be7fd605ef06f06dd950d2ee",
+    "semantic_hash": "072848b3be7fd605ef06f06dd950d2ee"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\feedback-section.tsx": {
+    "mtime": 1780806589.4270701,
+    "ast_hash": "679f6af7b9e71fff8b81c1ecfc8889cf",
+    "semantic_hash": "679f6af7b9e71fff8b81c1ecfc8889cf"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\find-person.tsx": {
+    "mtime": 1780806589.487917,
+    "ast_hash": "dcc4137e0c228bbaddc9d8b0d47a53ec",
+    "semantic_hash": "dcc4137e0c228bbaddc9d8b0d47a53ec"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\footer.tsx": {
+    "mtime": 1780855657.9623506,
+    "ast_hash": "8e8536ee3a45806462dd161568763bf2",
+    "semantic_hash": "8e8536ee3a45806462dd161568763bf2"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\hero.tsx": {
+    "mtime": 1780806589.5047574,
+    "ast_hash": "8b79106366c4ff16381534de62f6b164",
+    "semantic_hash": "8b79106366c4ff16381534de62f6b164"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\nav.tsx": {
+    "mtime": 1780860177.901364,
+    "ast_hash": "ea8ba797b8f1a1f2128a440178ce288d",
+    "semantic_hash": "ea8ba797b8f1a1f2128a440178ce288d"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\neural-deep-viz.tsx": {
+    "mtime": 1780816133.5038342,
+    "ast_hash": "a8413cc992f4d2e52200c97e3af82eba",
+    "semantic_hash": "a8413cc992f4d2e52200c97e3af82eba"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\neural-viz.tsx": {
+    "mtime": 1780816164.041188,
+    "ast_hash": "8ede34df2cf5e34562aece709fbd152f",
+    "semantic_hash": "8ede34df2cf5e34562aece709fbd152f"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\sign-in.tsx": {
+    "mtime": 1780858405.4223518,
+    "ast_hash": "6ed92931827a7177199c551fb56d35cd",
+    "semantic_hash": "6ed92931827a7177199c551fb56d35cd"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\testimonials-columns-1.tsx": {
+    "mtime": 1780805133.3120515,
+    "ast_hash": "29e9483be372aa152884b611eef2b84d",
+    "semantic_hash": "29e9483be372aa152884b611eef2b84d"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\theme-provider.tsx": {
+    "mtime": 1780859797.007514,
+    "ast_hash": "0394bf1b0dc9086cd277a591083ec2ef",
+    "semantic_hash": "0394bf1b0dc9086cd277a591083ec2ef"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\ui\\8bit-badge.tsx": {
+    "mtime": 1780801013.0127273,
+    "ast_hash": "8e73da58f5d6d1e3c260f0be6e4f0ea8",
+    "semantic_hash": "8e73da58f5d6d1e3c260f0be6e4f0ea8"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\ui\\8bit-card.tsx": {
+    "mtime": 1780801013.077852,
+    "ast_hash": "ca51029ac1367366bfe8c1af513ab783",
+    "semantic_hash": "ca51029ac1367366bfe8c1af513ab783"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\ui\\8bit-separator.tsx": {
+    "mtime": 1780801013.1347673,
+    "ast_hash": "28155038908fe7930d89b83ec6b80f59",
+    "semantic_hash": "28155038908fe7930d89b83ec6b80f59"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\ui\\badge.tsx": {
+    "mtime": 1780857186.2222736,
+    "ast_hash": "ad01e5e94310fd0993007d22b338378b",
+    "semantic_hash": "ad01e5e94310fd0993007d22b338378b"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\ui\\button.tsx": {
+    "mtime": 1780858402.6880257,
+    "ast_hash": "7aa4cc837d57b89bc83affc59d15b973",
+    "semantic_hash": "7aa4cc837d57b89bc83affc59d15b973"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\ui\\card.tsx": {
+    "mtime": 1780857187.8431206,
+    "ast_hash": "7205b7e292c2d4ff27c7220dbb7b3332",
+    "semantic_hash": "7205b7e292c2d4ff27c7220dbb7b3332"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\ui\\dotted-surface.tsx": {
+    "mtime": 1780856881.4774022,
+    "ast_hash": "c7d8ad0a45cb9b506ab47e6285315285",
+    "semantic_hash": "c7d8ad0a45cb9b506ab47e6285315285"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\ui\\gooey-filter.tsx": {
+    "mtime": 1780804158.0184135,
+    "ast_hash": "c026a8fcdd360bbe981ccd9eeea98e13",
+    "semantic_hash": "c026a8fcdd360bbe981ccd9eeea98e13"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\ui\\input.tsx": {
+    "mtime": 1780858403.9511056,
+    "ast_hash": "ecb405b96c6e8ee28251f196ad1ad3dc",
+    "semantic_hash": "ecb405b96c6e8ee28251f196ad1ad3dc"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\ui\\label.tsx": {
+    "mtime": 1780858772.7850027,
+    "ast_hash": "7815e7d74c90bcf798f0ce59e383b97f",
+    "semantic_hash": "7815e7d74c90bcf798f0ce59e383b97f"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\ui\\radial-orbital-timeline.tsx": {
+    "mtime": 1780857348.3584027,
+    "ast_hash": "c2d9162dc6c626797188831e6caf793d",
+    "semantic_hash": "c2d9162dc6c626797188831e6caf793d"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\components\\ui\\splite.tsx": {
+    "mtime": 1780804389.4789598,
+    "ast_hash": "1f3f64b858471a3e39330062e9cd5576",
+    "semantic_hash": "1f3f64b858471a3e39330062e9cd5576"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\eslint.config.mjs": {
+    "mtime": 1780800837.2697363,
+    "ast_hash": "6c4307ffa009658f5c97f5629094c0c2",
+    "semantic_hash": "6c4307ffa009658f5c97f5629094c0c2"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\next-env.d.ts": {
+    "mtime": 1780877146.682767,
+    "ast_hash": "b698cdd97fe8e3bd16dcd74899ad7cef",
+    "semantic_hash": "b698cdd97fe8e3bd16dcd74899ad7cef"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\next.config.ts": {
+    "mtime": 1780861680.25879,
+    "ast_hash": "2cd41ea3768f55a52466914176e3f8c2",
+    "semantic_hash": "2cd41ea3768f55a52466914176e3f8c2"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\package.json": {
+    "mtime": 1780859509.6303215,
+    "ast_hash": "40d395d0e84ad6a5d297a36fa859eb9b",
+    "semantic_hash": "40d395d0e84ad6a5d297a36fa859eb9b"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\postcss.config.mjs": {
+    "mtime": 1780800837.271328,
+    "ast_hash": "8b1fad1b1e72bac5525090c8e8000dc8",
+    "semantic_hash": "8b1fad1b1e72bac5525090c8e8000dc8"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\tsconfig.json": {
+    "mtime": 1780800837.2741237,
+    "ast_hash": "f031e1bf14375f11567de3bc872ca62b",
+    "semantic_hash": "f031e1bf14375f11567de3bc872ca62b"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\DESIGN.md": {
+    "mtime": 1780800700.7537632,
+    "ast_hash": "e07c77fae8e0bb80da09cf0d15ebbe62",
+    "semantic_hash": "e07c77fae8e0bb80da09cf0d15ebbe62"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\README.md": {
+    "mtime": 1780677463.8072944,
+    "ast_hash": "3baffb6675cfec91fddd2066fd2f8297",
+    "semantic_hash": "3baffb6675cfec91fddd2066fd2f8297"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\AGENTS.md": {
+    "mtime": 1780800837.2657354,
+    "ast_hash": "9346a4897ff955555ddedb7bebf77adb",
+    "semantic_hash": "9346a4897ff955555ddedb7bebf77adb"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\README.md": {
+    "mtime": 1780800837.2657354,
+    "ast_hash": "fab60f412cc9016f85fcc1f484d778bc",
+    "semantic_hash": "fab60f412cc9016f85fcc1f484d778bc"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\next-app\\public\\robots.txt": {
+    "mtime": 1780861600.0464346,
+    "ast_hash": "47328282f761c10aaebed7b435f16b6d",
+    "semantic_hash": "47328282f761c10aaebed7b435f16b6d"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\requirements.txt": {
+    "mtime": 1780681768.5970473,
+    "ast_hash": "3779f7308f5d6984ffb5f1fbe4b1fb90",
+    "semantic_hash": "3779f7308f5d6984ffb5f1fbe4b1fb90"
+  },
+  "C:\\Users\\barca\\projects\\neural network learning\\vggface2_path.txt": {
+    "mtime": 1780817333.8860455,
+    "ast_hash": "ea782699071dfc5cbab90d15bd556099",
+    "semantic_hash": "ea782699071dfc5cbab90d15bd556099"
   }
 }

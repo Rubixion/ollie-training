@@ -4,7 +4,7 @@ import Link from "next/link"
 import { Nav } from "@/components/nav"
 import { Footer } from "@/components/footer"
 import { allPosts, getPost } from "@/lib/blog-posts"
-import { ArrowLeft, Clock, User, Calendar, ChevronRight } from "lucide-react"
+import { ArrowLeft, ArrowRight, Clock, User, Calendar, ChevronRight } from "lucide-react"
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -229,6 +229,39 @@ export default async function BlogPostPage({ params }: Props) {
               </div>
             </section>
           )}
+
+          {/* CTA */}
+          <section className="mt-14 p-7 rounded-2xl bg-sky-400/5 border border-sky-400/20">
+            <p className="text-[10px] font-bold tracking-widest uppercase text-sky-400/60 mb-2">Try it yourself</p>
+            <h2 className="text-xl font-bold text-white mb-2">Find your celebrity match</h2>
+            <p className="text-white/50 text-sm mb-5">
+              Upload a photo and see which celebrity you most resemble, powered by Ollie&apos;s AI face recognition.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/match"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-sky-400 text-black text-sm font-bold hover:bg-sky-300 transition-colors"
+              >
+                Find my celebrity match <ArrowRight size={14} />
+              </Link>
+              {(post.category === "Machine Learning" || post.category === "Deep Dive" || post.category === "Technology") && (
+                <Link
+                  href="/ai"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/8 border border-white/15 text-white/70 text-sm font-semibold hover:bg-white/12 hover:text-white transition-all"
+                >
+                  How Ollie works <ArrowRight size={14} />
+                </Link>
+              )}
+              {(post.slug.includes("feedback") || post.slug.includes("improving") || post.slug.includes("accuracy") || post.slug.includes("bias") || post.slug.includes("confidence") || post.slug.includes("understanding")) && (
+                <Link
+                  href="/feedback"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/8 border border-white/15 text-white/70 text-sm font-semibold hover:bg-white/12 hover:text-white transition-all"
+                >
+                  Give feedback <ArrowRight size={14} />
+                </Link>
+              )}
+            </div>
+          </section>
 
           {/* Related posts */}
           {relatedPosts.length > 0 && (

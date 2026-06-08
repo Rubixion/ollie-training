@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     let gradioRes: Response
     try {
-      gradioRes = await fetch("http://127.0.0.1:7860/run/predict", {
+      gradioRes = await fetch(`${process.env.GRADIO_URL ?? "http://127.0.0.1:7860"}/run/predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(gradioPayload),
