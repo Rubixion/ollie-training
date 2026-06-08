@@ -353,11 +353,17 @@ def _train_worker():
                     compatible = False
                     log("Old checkpoint is incompatible with new architecture — starting fresh.")
             if compatible:
-                try:
-                    optimizer.load_state_dict(ckpt['optimizer'])
-                    scheduler.load_state_dict(ckpt['scheduler'])
-                except Exception:
-                    pass
+                if ckpt.get('finetune', False):
+                    for pg in optimizer.param_groups:
+                        pg['lr'] = 1e-4
+                    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=150, eta_min=1e-6)
+                    log("Fine-tuning from pre-trained model — lr=1e-4, T_max=150\n")
+                else:
+                    try:
+                        optimizer.load_state_dict(ckpt['optimizer'])
+                        scheduler.load_state_dict(ckpt['scheduler'])
+                    except Exception:
+                        pass
                 start_epoch = ckpt['epoch'] + 1
                 best_acc    = ckpt['best_acc']
                 threshold   = ckpt.get('threshold', 0.5)

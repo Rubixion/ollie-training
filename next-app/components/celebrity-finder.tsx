@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, DragEvent, ChangeEvent } from "react"
 import { motion } from "framer-motion"
 import { Upload, X, Search, Loader2, AlertCircle, User } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
+import { supabase } from "@/lib/supabase"
 
 
 interface Match {
@@ -114,9 +115,15 @@ export function CelebrityFinder() {
     setMatches(null)
 
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
       const res = await fetch("/api/search", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ image: imageDataUrl, mode }),
       })
 

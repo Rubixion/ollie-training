@@ -1,20 +1,28 @@
 import { MetadataRoute } from "next"
+import { allPosts } from "@/lib/blog-posts"
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ollieai.app"
+const now = new Date()
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return [
-    { url: siteUrl, lastModified: "2026-06-07", changeFrequency: "weekly", priority: 1.0 },
-    { url: `${siteUrl}/match`, lastModified: "2026-06-07", changeFrequency: "monthly", priority: 0.9 },
-    { url: `${siteUrl}/ai`, lastModified: "2026-06-07", changeFrequency: "monthly", priority: 0.8 },
-    { url: `${siteUrl}/search`, lastModified: "2026-06-07", changeFrequency: "monthly", priority: 0.6 },
-    { url: `${siteUrl}/blog`, lastModified: "2026-06-07", changeFrequency: "weekly", priority: 0.8 },
-    { url: `${siteUrl}/blog/how-face-recognition-works`, lastModified: "2026-06-07", changeFrequency: "yearly", priority: 0.7 },
-    { url: `${siteUrl}/blog/find-your-celebrity-lookalike`, lastModified: "2026-06-07", changeFrequency: "yearly", priority: 0.7 },
-    { url: `${siteUrl}/blog/siamese-neural-networks-explained`, lastModified: "2026-06-07", changeFrequency: "yearly", priority: 0.6 },
-    { url: `${siteUrl}/about`, lastModified: "2026-06-07", changeFrequency: "monthly", priority: 0.5 },
-    { url: `${siteUrl}/contact`, lastModified: "2026-06-07", changeFrequency: "yearly", priority: 0.4 },
-    { url: `${siteUrl}/privacy`, lastModified: "2026-06-07", changeFrequency: "yearly", priority: 0.3 },
-    { url: `${siteUrl}/terms`, lastModified: "2026-06-07", changeFrequency: "yearly", priority: 0.3 },
+  const staticRoutes: MetadataRoute.Sitemap = [
+    { url: siteUrl, lastModified: now, changeFrequency: "weekly", priority: 1.0 },
+    { url: `${siteUrl}/match`, lastModified: now, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${siteUrl}/ai`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${siteUrl}/blog`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${siteUrl}/feedback`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${siteUrl}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${siteUrl}/contact`, lastModified: now, changeFrequency: "yearly", priority: 0.4 },
+    { url: `${siteUrl}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${siteUrl}/terms`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
   ]
+
+  const blogRoutes: MetadataRoute.Sitemap = allPosts.map((post) => ({
+    url: `${siteUrl}/blog/${post.slug}`,
+    lastModified: new Date(post.isoDate),
+    changeFrequency: "yearly",
+    priority: 0.7,
+  }))
+
+  return [...staticRoutes, ...blogRoutes]
 }

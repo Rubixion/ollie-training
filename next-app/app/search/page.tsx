@@ -6,6 +6,7 @@ import { FindPerson } from "@/components/find-person"
 export const metadata = {
   title: "Face Search Ollie",
   description: "Internet-scale face search. Coming soon.",
+  robots: { index: false, follow: false },
 }
 
 export default function FindPersonPage() {

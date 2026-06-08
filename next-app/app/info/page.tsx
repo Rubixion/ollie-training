@@ -281,6 +281,7 @@ export default function InfoPage() {
 
   return (
     <main className="relative min-h-screen bg-transparent">
+      <meta name="robots" content="noindex,nofollow" />
       <BGPattern variant="horizontal-lines" mask="fade-edges" fill="rgba(255,255,255,0.06)" size={28} className="fixed" />
       <Nav />
 
