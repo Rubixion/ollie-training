@@ -18,6 +18,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 import faiss
 import torch
+import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import gradio as gr
@@ -26,12 +27,12 @@ from torch.utils.data import DataLoader
 import kagglehub
 
 from lfw_pytorch import (
-    SiameseNet, FacePairDataset,
+    SiameseNet, FacePairDataset, MarginCosineProduct,
     train_transform, test_transform,
     DEVICE, EMBEDDING_SIZE, IMAGE_SIZE,
     load_csv_pairs, load_pairs_csv, generate_pairs_from_filesystem, generate_pairs_from_flat_dir,
     get_names_from_csv, k_fold_eval,
-    scan_ms1mv2, sample_ms1mv2_epoch_pairs,
+    scan_ms1mv2, sample_ms1mv2_epoch_pairs, MS1MV2Dataset,
 )
 from face_features import build_feature_cache, extract_face_features, FEAT_DIM, _ZERO_VEC, using_gpu
 from celebrity_scraper import (
@@ -423,6 +424,8 @@ def _train_worker(start_fresh=False):
             with _lock:
                 _log_lines.append(msg)
 
+        torch.backends.cudnn.benchmark = True
+
         # ── LFW test set (evaluation only, never trained on) ─────────────────
         log("Loading LFW test pairs (all 6,000 — reference protocol)...")
         test_pairs = load_pairs_csv(dp, exclude_people=set())
@@ -432,12 +435,16 @@ def _train_worker(start_fresh=False):
         else:
             log(f"  {len(test_pairs)} pairs loaded for 10-fold CV")
 
-        # All LFW people are blocked from training to prevent leakage
         test_people = set()
         for p1, p2, _ in test_pairs:
             test_people.add(os.path.basename(os.path.dirname(p1)))
             test_people.add(os.path.basename(os.path.dirname(p2)))
         log(f"  Protecting {len(test_people)} LFW identities from training")
+
+        # test loader fixed for all epochs — no features needed (pure CNN embeddings)
+        test_loader = DataLoader(
+            FacePairDataset(test_pairs, test_transform, feature_cache=None),
+            batch_size=256, shuffle=False, num_workers=0, pin_memory=True)
 
         # ── MS1MV2 — sole training source ────────────────────────────────────
         ms1mv2_root = _ms1mv2_root()
@@ -447,38 +454,34 @@ def _train_worker(start_fresh=False):
 
         log("Scanning MS1MV2 identities (one-time, ~30 s for 85k folders)...")
         ms1mv2_persons = scan_ms1mv2(ms1mv2_root, exclude_people=test_people)
-        n_ids   = len(ms1mv2_persons)
-        n_imgs  = sum(len(v) for v in ms1mv2_persons.values())
-        log(f"  {n_ids:,} identities  |  {n_imgs:,} images available")
-        # 5 pos pairs per identity → ~428k pos + ~428k neg = ~857k pairs/epoch
-        # Every identity seen every epoch with fresh random combinations.
-        PAIRS_PER_ID = 5
-        log(f"  {PAIRS_PER_ID} pairs/identity → ~{n_ids * PAIRS_PER_ID * 2:,} pairs per epoch\n")
+        n_ids  = len(ms1mv2_persons)
+        n_imgs = sum(len(v) for v in ms1mv2_persons.values())
+        log(f"  {n_ids:,} identities  |  {n_imgs:,} images")
+        IMGS_PER_ID = 5   # images sampled per identity per epoch
+        log(f"  {IMGS_PER_ID} imgs/identity → ~{n_ids * IMGS_PER_ID:,} images per epoch\n")
 
-        # ── geometric feature cache for LFW test images only ─────────────────
-        test_img_paths = list({p for pair in test_pairs for p in pair[:2]})
-        log(f"Building feature cache for {len(test_img_paths)} LFW test images...")
+        def _sample_epoch(n_per_id):
+            """Sample n_per_id images from each identity; returns [(path, class_idx)]."""
+            out = []
+            for class_idx, (_, imgs) in enumerate(ms1mv2_persons.items()):
+                chosen = random.sample(imgs, min(n_per_id, len(imgs)))
+                for p in chosen:
+                    out.append((p, class_idx))
+            random.shuffle(out)
+            return out
 
-        def feat_progress(done, total):
-            if done % 500 == 0 or done == total:
-                log(f"  Features: {done}/{total}")
-
+        # ── model + CosFace head ──────────────────────────────────────────────
         global _feat_cache, _embed_index
-        _feat_cache = build_feature_cache(test_img_paths, FEAT_CACHE, progress_cb=feat_progress)
-        log(f"Feature cache ready ({len(_feat_cache)} entries).\n")
+        model        = SiameseNet(embedding_size=EMBEDDING_SIZE, dropout=0.25, feat_dim=FEAT_DIM).to(DEVICE)
+        cosface_head = MarginCosineProduct(EMBEDDING_SIZE, n_ids).to(DEVICE)
+        criterion    = nn.CrossEntropyLoss()
 
-        # test loader is fixed for all epochs
-        test_loader = DataLoader(
-            FacePairDataset(test_pairs, test_transform, feature_cache=_feat_cache),
-            batch_size=32, shuffle=False, num_workers=0)
-
-        model = SiameseNet(embedding_size=EMBEDDING_SIZE, dropout=0.25, feat_dim=FEAT_DIM).to(DEVICE)
-
-        # SGD + MultiStepLR — same schedule as the InsightFace reference
-        optimizer_type = 'SGD'
-        optimizer  = optim.SGD(model.parameters(), lr=0.05, momentum=0.9, weight_decay=5e-4)
-        scheduler  = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 20, 30], gamma=0.1)
-        log("Optimizer: SGD lr=0.05 momentum=0.9 wd=5e-4  |  MultiStepLR [10,20,30]×0.1")
+        # SGD lr=0.1 — matches reference exactly
+        optimizer = optim.SGD(
+            [{'params': model.parameters()}, {'params': cosface_head.parameters()}],
+            lr=0.1, momentum=0.9, weight_decay=5e-4)
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 20, 25], gamma=0.1)
+        log("Optimizer: SGD lr=0.1 momentum=0.9 wd=5e-4  |  MultiStepLR [10,20,25]×0.1")
 
         start_epoch = 0
         best_acc    = 0.0
@@ -486,122 +489,115 @@ def _train_worker(start_fresh=False):
 
         if start_fresh:
             log("Starting from scratch — existing checkpoint ignored.\n")
-
-        if not start_fresh and os.path.exists(APP_CHECKPOINT):
-            ckpt       = torch.load(APP_CHECKPOINT, map_location=DEVICE, weights_only=False)
-            compatible = True
+        elif os.path.exists(APP_CHECKPOINT):
+            ckpt = torch.load(APP_CHECKPOINT, map_location=DEVICE, weights_only=False)
             try:
                 model.load_state_dict(ckpt['model'], strict=True)
             except RuntimeError:
                 try:
                     model.load_state_dict(ckpt['model'], strict=False)
-                    log("Architecture changed — backbone loaded, new layers start fresh.")
+                    log("Architecture changed — backbone loaded, head layers start fresh.")
                 except RuntimeError:
-                    compatible = False
-                    log("Old checkpoint is incompatible with new architecture — starting fresh.")
-            if compatible:
-                if ckpt.get('finetune', False):
-                    for pg in optimizer.param_groups:
-                        pg['lr'] = 1e-4
-                    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=150, eta_min=1e-6)
-                    log("Fine-tuning from pre-trained model — lr=1e-4, T_max=150\n")
-                else:
-                    # Only restore optimizer state when the type matches (Adam↔SGD incompatible)
-                    if ckpt.get('optimizer_type', 'Adam') == optimizer_type:
-                        try:
-                            optimizer.load_state_dict(ckpt['optimizer'])
-                            scheduler.load_state_dict(ckpt['scheduler'])
-                        except Exception:
-                            pass
-                    else:
-                        log(f"Optimizer changed ({ckpt.get('optimizer_type','Adam')} → {optimizer_type}) — using fresh optimizer.")
+                    log("Checkpoint incompatible (old embedding size?) — starting fresh.")
+                    ckpt = None
+            if ckpt is not None:
+                # restore cosface head if it was saved and matches current n_ids
+                if 'cosface_head' in ckpt and ckpt.get('n_ids') == n_ids:
+                    try:
+                        cosface_head.load_state_dict(ckpt['cosface_head'])
+                    except RuntimeError:
+                        pass
+                try:
+                    optimizer.load_state_dict(ckpt['optimizer'])
+                    scheduler.load_state_dict(ckpt['scheduler'])
+                except Exception:
+                    pass
                 start_epoch = ckpt['epoch'] + 1
                 best_acc    = ckpt['best_acc']
                 threshold   = ckpt.get('threshold', 0.5)
-                log(f"Resumed from epoch {ckpt['epoch']}  (best: {best_acc*100:.1f}%)\n")
-            else:
-                log("Starting fresh.\n")
+                log(f"Resumed from epoch {ckpt['epoch']}  (best LFW: {best_acc*100:.1f}%)\n")
         else:
             log("No checkpoint — starting fresh.\n")
 
-        for epoch in range(start_epoch, 300):
+        PATIENCE   = 10
+        no_improve = 0
+
+        for epoch in range(start_epoch, 34):
             if _stop_event.is_set():
                 log("Stopped by user.")
                 break
 
-            # Fresh pairs every epoch — all 85.7k identities, new random combinations
-            epoch_pairs = sample_ms1mv2_epoch_pairs(ms1mv2_persons, PAIRS_PER_ID)
+            # Fresh sample of images every epoch — covers all identities, new combos
+            samples = _sample_epoch(IMGS_PER_ID)
             train_loader = DataLoader(
-                FacePairDataset(epoch_pairs, train_transform, feature_cache={}),
-                batch_size=32, shuffle=True, num_workers=0)
+                MS1MV2Dataset(samples, train_transform),
+                batch_size=256, shuffle=True, num_workers=0, pin_memory=True)
 
-            # ── train ────────────────────────────────────────────────────────
+            # ── train (CosFace classification) ───────────────────────────────
             model.train()
-            tr_loss = tr_correct = tr_total = 0
-            for img1, img2, labels, f1, f2 in train_loader:
-                img1, img2 = img1.to(DEVICE), img2.to(DEVICE)
-                labels     = labels.to(DEVICE)
-                f1, f2     = f1.to(DEVICE), f2.to(DEVICE)
-                e1   = model.get_embedding(img1, f1)
-                e2   = model.get_embedding(img2, f2)
-                dist = F.pairwise_distance(e1, e2)
-                loss = contrastive_loss(dist, labels)
+            cosface_head.train()
+            tr_correct = tr_total = 0
+            for imgs, targets in train_loader:
+                imgs, targets = imgs.to(DEVICE), targets.long().to(DEVICE)
+                embs   = model.get_embedding(imgs)
+                logits = cosface_head(embs, targets)
+                loss   = criterion(logits, targets)
                 optimizer.zero_grad()
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
                 optimizer.step()
-                tr_loss    += loss.item() * len(labels)
-                tr_correct += ((dist < threshold) == labels.bool()).sum().item()
-                tr_total   += len(labels)
+                tr_correct += (logits.argmax(1) == targets).sum().item()
+                tr_total   += len(targets)
 
-            # ── eval ─────────────────────────────────────────────────────────
+            # ── eval (LFW 10-fold CV — pure CNN embeddings, no feats) ────────
             model.eval()
-            te_loss = te_total = 0
             all_dists, all_labels_np = [], []
             with torch.no_grad():
-                for img1, img2, labels, f1, f2 in test_loader:
+                for img1, img2, labels in test_loader:
                     img1, img2 = img1.to(DEVICE), img2.to(DEVICE)
-                    labels     = labels.to(DEVICE)
-                    f1, f2     = f1.to(DEVICE), f2.to(DEVICE)
-                    e1   = model.get_embedding(img1, f1)
-                    e2   = model.get_embedding(img2, f2)
+                    e1   = model.get_embedding(img1)
+                    e2   = model.get_embedding(img2)
                     dist = F.pairwise_distance(e1, e2)
-                    loss = contrastive_loss(dist, labels)
-                    te_loss       += loss.item() * len(labels)
-                    te_total      += len(labels)
                     all_dists.extend(dist.cpu().numpy())
-                    all_labels_np.extend(labels.cpu().numpy())
+                    all_labels_np.extend(labels.numpy())
 
             all_dists     = np.array(all_dists)
             all_labels_np = np.array(all_labels_np)
-
-            # 10-fold cross-validation (reference protocol)
             te_acc, te_std, threshold = k_fold_eval(all_dists, all_labels_np)
-
             tr_acc = tr_correct / tr_total
             scheduler.step()
 
             if te_acc > best_acc:
-                best_acc = te_acc
+                best_acc   = te_acc
+                no_improve = 0
                 torch.save(model.state_dict(), APP_BEST)
                 if os.path.exists(EMBED_CACHE):
                     os.remove(EMBED_CACHE)
                 _embed_index = None
+                log(f"  ↑ New best — saved app_best.pt")
+            else:
+                no_improve += 1
 
             torch.save({
                 'epoch': epoch, 'model': model.state_dict(),
+                'cosface_head': cosface_head.state_dict(),
                 'optimizer': optimizer.state_dict(),
                 'scheduler': scheduler.state_dict(),
                 'best_acc': best_acc, 'threshold': threshold,
-                'optimizer_type': optimizer_type,
+                'n_ids': n_ids, 'optimizer_type': 'SGD',
             }, APP_CHECKPOINT)
 
             lr = optimizer.param_groups[0]['lr']
-            log(f"Epoch {epoch:3d}  train {tr_acc*100:.1f}%  "
+            log(f"Epoch {epoch:2d}/{33}  train {tr_acc*100:.1f}%  "
                 f"LFW {te_acc*100:.2f}%±{te_std*100:.2f}%  best {best_acc*100:.2f}%  "
-                f"thr {threshold:.3f}  lr={lr:.2e}")
+                f"thr {threshold:.3f}  lr={lr:.2e}"
+                + (f"  [no improve {no_improve}/{PATIENCE}]" if no_improve > 0 else ""))
 
-        log(f"\nDone. Best test accuracy: {best_acc*100:.1f}%")
+            if no_improve >= PATIENCE:
+                log(f"\nEarly stopping — no LFW improvement for {PATIENCE} epochs.")
+                break
+
+        log(f"\nDone. Best LFW accuracy: {best_acc*100:.2f}%")
 
     except Exception as exc:
         with _lock:
@@ -1192,7 +1188,10 @@ def _load_model_file(path: str):
     try:
         m.load_state_dict(state, strict=True)
     except RuntimeError:
-        m.load_state_dict(state, strict=False)
+        try:
+            m.load_state_dict(state, strict=False)
+        except RuntimeError:
+            pass  # incompatible checkpoint (e.g. old 256-dim) — return fresh model
     m.eval()
     return m
 

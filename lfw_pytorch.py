@@ -26,17 +26,14 @@ from PIL import Image
 
 DEVICE         = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 IMAGE_SIZE     = 112   # MS1MV2 native alignment size (112×112 pre-cropped faces)
-EMBEDDING_SIZE = 256   # exported so app.py stays in sync
+EMBEDDING_SIZE = 512   # exported so app.py stays in sync
 
 
 # ── transforms ────────────────────────────────────────────────────────────────
 
 train_transform = T.Compose([
-    T.Resize(IMAGE_SIZE + 8),               # 120 — tight pad; MS1MV2 is pre-aligned at 112
-    T.RandomCrop(IMAGE_SIZE),               # 112
+    # MS1MV2 images are pre-aligned to 112×112 — match the reference: flip + normalize only
     T.RandomHorizontalFlip(),
-    T.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.2, hue=0.05),
-    T.RandomGrayscale(p=0.05),
     T.ToTensor(),
     T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
 ])
@@ -106,6 +103,24 @@ class FacePairDataset(Dataset):
         except Exception:
             # corrupt / truncated file — return a black placeholder
             return self.transform(Image.new('RGB', (IMAGE_SIZE, IMAGE_SIZE)))
+
+
+class MS1MV2Dataset(Dataset):
+    """Single-image identity classification dataset used for CosFace training."""
+    def __init__(self, samples, transform):
+        self.samples   = samples   # list of (path, class_idx)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        path, label = self.samples[idx]
+        try:
+            img = self.transform(Image.open(path).convert('RGB'))
+        except Exception:
+            img = self.transform(Image.new('RGB', (IMAGE_SIZE, IMAGE_SIZE)))
+        return img, label
 
 
 # ── model ──────────────────────────────────────────────────────────────────────
