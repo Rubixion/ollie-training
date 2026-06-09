@@ -61,7 +61,7 @@ class MarginCosineProduct(nn.Module):
 
     def forward(self, embeddings, labels):
         cosine  = F.linear(F.normalize(embeddings), F.normalize(self.weight))
-        one_hot = F.one_hot(labels.long(), num_classes=self.weight.size(0)).float()
+        one_hot = F.one_hot(labels.long(), num_classes=self.weight.size(0)).to(dtype=embeddings.dtype)
         return self.s * (cosine - one_hot * self.m)
 
 

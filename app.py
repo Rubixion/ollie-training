@@ -656,7 +656,8 @@ def _train_worker(start_fresh=False):
 
         train_loader = DataLoader(
             MS1MV2Dataset(all_samples, train_transform),
-            batch_size=512, shuffle=True, num_workers=2, pin_memory=True)
+            batch_size=512, shuffle=True, num_workers=4, pin_memory=True,
+            persistent_workers=True)
 
         for epoch in range(start_epoch, 35):
             if _stop_event.is_set():
@@ -676,7 +677,7 @@ def _train_worker(start_fresh=False):
                     logits = cosface_head(embs, targets)
                     loss   = criterion(logits, targets)
 
-                optimizer.zero_grad()
+                optimizer.zero_grad(set_to_none=True)
                 scaler.scale(loss).backward()
                 scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_norm_(
