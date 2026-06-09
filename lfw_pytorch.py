@@ -32,17 +32,16 @@ EMBEDDING_SIZE = 512   # exported so app.py stays in sync
 # ── transforms ────────────────────────────────────────────────────────────────
 
 train_transform = T.Compose([
-    # MS1MV2 images are pre-aligned to 112×112 — match the reference: flip + normalize only
     T.RandomHorizontalFlip(),
     T.ToTensor(),
-    T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    T.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
 ])
 
 test_transform = T.Compose([
     T.Resize(IMAGE_SIZE),
     T.CenterCrop(IMAGE_SIZE),
     T.ToTensor(),
-    T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    T.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
 ])
 
 

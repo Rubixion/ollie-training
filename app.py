@@ -654,16 +654,14 @@ def _train_worker(start_fresh=False):
         else:
             log("No checkpoint — starting fresh.\n")
 
+        train_loader = DataLoader(
+            MS1MV2Dataset(all_samples, train_transform),
+            batch_size=512, shuffle=True, num_workers=2, pin_memory=True)
+
         for epoch in range(start_epoch, 35):
             if _stop_event.is_set():
                 log("Stopped by user.")
                 break
-
-            # Reshuffle all images — fresh order every epoch
-            random.shuffle(all_samples)
-            train_loader = DataLoader(
-                MS1MV2Dataset(all_samples, train_transform),
-                batch_size=256, shuffle=False, num_workers=2, pin_memory=True)
 
             # ── train (CosFace + AMP) ─────────────────────────────────────────
             model.train()
