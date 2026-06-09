@@ -50,15 +50,15 @@ test_transform = T.Compose([
 
 class MarginCosineProduct(nn.Module):
     """CosFace: Large Margin Cosine Loss.
-    Used when training with per-identity class labels (e.g. MS1MV2).
-    s=30 and m=0.40 are the standard values for face recognition.
+    s=64 matches InsightFace training configs (sharper softmax, stronger gradients).
+    m=0.40 from the original CosFace paper.
     """
-    def __init__(self, in_features, out_features, s=30.0, m=0.40):
+    def __init__(self, in_features, out_features, s=64.0, m=0.40):
         super().__init__()
         self.s = s
         self.m = m
         self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
-        nn.init.xavier_uniform_(self.weight)
+        nn.init.normal_(self.weight, std=0.01)
 
     def forward(self, embeddings, labels):
         cosine  = F.linear(F.normalize(embeddings), F.normalize(self.weight))
@@ -168,7 +168,7 @@ class SphereFaceNet(nn.Module):
         self.bn     = nn.BatchNorm1d(embedding_size)
         for m in self.modules():
             if isinstance(m, (nn.Conv2d, nn.Linear)):
-                nn.init.xavier_uniform_(m.weight)
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0.0)
 

@@ -654,10 +654,7 @@ def _train_worker(start_fresh=False):
         else:
             log("No checkpoint — starting fresh.\n")
 
-        PATIENCE   = 10
-        no_improve = 0
-
-        for epoch in range(start_epoch, 34):
+        for epoch in range(start_epoch, 35):
             if _stop_event.is_set():
                 log("Stopped by user.")
                 break
@@ -684,7 +681,8 @@ def _train_worker(start_fresh=False):
                 optimizer.zero_grad()
                 scaler.scale(loss).backward()
                 scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+                torch.nn.utils.clip_grad_norm_(
+                    list(model.parameters()) + list(cosface_head.parameters()), 5.0)
                 scaler.step(optimizer)
                 scaler.update()
 
@@ -712,15 +710,12 @@ def _train_worker(start_fresh=False):
             scheduler.step()
 
             if te_acc > best_acc:
-                best_acc   = te_acc
-                no_improve = 0
+                best_acc = te_acc
                 torch.save(model.state_dict(), APP_BEST)
                 if os.path.exists(EMBED_CACHE):
                     os.remove(EMBED_CACHE)
                 _embed_index = None
                 log(f"  ↑ New best — saved app_best.pt")
-            else:
-                no_improve += 1
 
             torch.save({
                 'epoch': epoch, 'model': model.state_dict(),
@@ -733,14 +728,9 @@ def _train_worker(start_fresh=False):
             }, APP_CHECKPOINT)
 
             lr = optimizer.param_groups[0]['lr']
-            log(f"Epoch {epoch:2d}/{33}  train {tr_acc*100:.1f}%  "
+            log(f"Epoch {epoch:2d}/34  train {tr_acc*100:.1f}%  "
                 f"LFW {te_acc*100:.2f}%±{te_std*100:.2f}%  best {best_acc*100:.2f}%  "
-                f"thr {threshold:.3f}  lr={lr:.2e}"
-                + (f"  [no improve {no_improve}/{PATIENCE}]" if no_improve > 0 else ""))
-
-            if no_improve >= PATIENCE:
-                log(f"\nEarly stopping — no LFW improvement for {PATIENCE} epochs.")
-                break
+                f"thr {threshold:.3f}  lr={lr:.2e}")
 
         log(f"\nDone. Best LFW accuracy: {best_acc*100:.2f}%")
 
