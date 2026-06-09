@@ -371,6 +371,62 @@ def generate_pairs_from_flat_dir(root, exclude_people, max_pos=50000):
     return all_positive + negative
 
 
+def scan_ms1mv2(root, exclude_people=None):
+    """
+    Pre-scan the MS1MV2 directory once.  Returns {identity: [image_paths]}.
+    Call once before the epoch loop; pass the result to sample_ms1mv2_epoch_pairs.
+    """
+    if exclude_people is None:
+        exclude_people = set()
+    person_images = {}
+    for name in sorted(os.listdir(root)):
+        if name in exclude_people:
+            continue
+        folder = os.path.join(root, name)
+        if not os.path.isdir(folder):
+            continue
+        imgs = [
+            os.path.join(folder, f) for f in os.listdir(folder)
+            if f.lower().endswith(('.jpg', '.jpeg', '.png'))
+        ]
+        if len(imgs) >= 2:
+            person_images[name] = imgs
+    return person_images
+
+
+def sample_ms1mv2_epoch_pairs(person_images, pairs_per_identity=5):
+    """
+    Sample a fresh set of pairs from the pre-scanned MS1MV2 dict for one epoch.
+    Every identity is included every epoch; pairs differ each call so the model
+    sees new combinations over time.  Returns ~2 * identities * pairs_per_identity pairs.
+    """
+    names = list(person_images.keys())
+    positive = []
+    for name, imgs in person_images.items():
+        k = min(pairs_per_identity, len(imgs) // 2)
+        if k == 0:
+            continue
+        pool = random.sample(imgs, min(k * 2, len(imgs)))
+        for i in range(0, len(pool) - 1, 2):
+            positive.append((pool[i], pool[i + 1], 1.0))
+
+    n_neg = len(positive)
+    negative = []
+    attempts = 0
+    while len(negative) < n_neg and attempts < n_neg * 10:
+        n1, n2 = random.sample(names, 2)
+        negative.append((
+            random.choice(person_images[n1]),
+            random.choice(person_images[n2]),
+            0.0,
+        ))
+        attempts += 1
+
+    pairs = positive + negative
+    random.shuffle(pairs)
+    return pairs
+
+
 # ── 10-fold cross-validation evaluation (reference protocol) ──────────────────
 
 def k_fold_eval(all_dists, all_labels, n_folds=10):

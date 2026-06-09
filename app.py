@@ -31,6 +31,7 @@ from lfw_pytorch import (
     DEVICE, EMBEDDING_SIZE, IMAGE_SIZE,
     load_csv_pairs, load_pairs_csv, generate_pairs_from_filesystem, generate_pairs_from_flat_dir,
     get_names_from_csv, k_fold_eval,
+    scan_ms1mv2, sample_ms1mv2_epoch_pairs,
 )
 from face_features import build_feature_cache, extract_face_features, FEAT_DIM, _ZERO_VEC, using_gpu
 from celebrity_scraper import (
@@ -414,7 +415,7 @@ def _describe_features(feats):
 
 # ── TRAINING TAB ──────────────────────────────────────────────────────────────
 
-def _train_worker():
+def _train_worker(start_fresh=False):
     try:
         dp = _get_dataset()
 
@@ -422,112 +423,71 @@ def _train_worker():
             with _lock:
                 _log_lines.append(msg)
 
-        # Reference protocol: use ALL 6,000 LFW pairs for 10-fold CV evaluation
+        # ── LFW test set (evaluation only, never trained on) ─────────────────
         log("Loading LFW test pairs (all 6,000 — reference protocol)...")
-        test_pairs = load_pairs_csv(dp, exclude_people=set())   # all 6k, no exclusions
+        test_pairs = load_pairs_csv(dp, exclude_people=set())
         if not test_pairs:
-            # fallback if pairs.csv missing
             test_pairs = load_csv_pairs(dp, "matchpairsDevTest.csv", "mismatchpairsDevTest.csv")
             log(f"  pairs.csv not found — using DevTest ({len(test_pairs)} pairs)")
         else:
             log(f"  {len(test_pairs)} pairs loaded for 10-fold CV")
 
-        # Exclude ALL LFW evaluation people from training to prevent leakage
+        # All LFW people are blocked from training to prevent leakage
         test_people = set()
         for p1, p2, _ in test_pairs:
             test_people.add(os.path.basename(os.path.dirname(p1)))
             test_people.add(os.path.basename(os.path.dirname(p2)))
-        log(f"  Protecting {len(test_people)} LFW people from training data")
+        log(f"  Protecting {len(test_people)} LFW identities from training")
 
-        log("Loading LFW train pairs...")
-        # DevTrain / auto-generated only for people NOT in the test set
-        official  = load_csv_pairs(dp, "matchpairsDevTrain.csv", "mismatchpairsDevTrain.csv")
-        # filter official to exclude test people
-        official  = [(p1, p2, l) for p1, p2, l in official
-                     if os.path.basename(os.path.dirname(p1)) not in test_people
-                     and os.path.basename(os.path.dirname(p2)) not in test_people]
-        generated = generate_pairs_from_filesystem(dp, exclude_people=test_people, max_pos=15000)
-        log(f"  DevTrain CSV (filtered): {len(official)}  |  auto-generated: {len(generated)}")
-
-        # VGGFace2 pairs (capped to avoid memory issues on small GPUs)
-        vgg_root = _vgg_root()
-        if vgg_root:
-            log("Loading VGGFace2 pairs...")
-            vgg_pairs = generate_pairs_from_flat_dir(
-                vgg_root, exclude_people=test_people, max_pos=80000)
-            log(f"  VGGFace2: {len(vgg_pairs)} pairs from {vgg_root}")
-        else:
-            vgg_pairs = []
-
-        # MS1MV2 pairs — 85.7k identities, 5.8M images (InsightFace standard)
+        # ── MS1MV2 — sole training source ────────────────────────────────────
         ms1mv2_root = _ms1mv2_root()
-        if ms1mv2_root:
-            log("Loading MS1MV2 pairs (85.7k identities — may take ~30 sec)...")
-            ms1mv2_pairs = generate_pairs_from_flat_dir(
-                ms1mv2_root, exclude_people=test_people, max_pos=300000)
-            log(f"  MS1MV2: {len(ms1mv2_pairs)} pairs from {ms1mv2_root}")
-        else:
-            ms1mv2_pairs = []
+        if not ms1mv2_root:
+            log("ERROR: MS1MV2 not set up. Use the Download button in the Training tab first.")
+            return
 
-        celeb_pairs = get_scraped_pairs(SCRAPE_ROOT)
-        if celeb_pairs:
-            log(f"Using {len(celeb_pairs)} scraped celebrity pairs.")
+        log("Scanning MS1MV2 identities (one-time, ~30 s for 85k folders)...")
+        ms1mv2_persons = scan_ms1mv2(ms1mv2_root, exclude_people=test_people)
+        n_ids   = len(ms1mv2_persons)
+        n_imgs  = sum(len(v) for v in ms1mv2_persons.values())
+        log(f"  {n_ids:,} identities  |  {n_imgs:,} images available")
+        # 5 pos pairs per identity → ~428k pos + ~428k neg = ~857k pairs/epoch
+        # Every identity seen every epoch with fresh random combinations.
+        PAIRS_PER_ID = 5
+        log(f"  {PAIRS_PER_ID} pairs/identity → ~{n_ids * PAIRS_PER_ID * 2:,} pairs per epoch\n")
 
-        feedback = []
-        if os.path.exists(FEEDBACK_CSV):
-            with open(FEEDBACK_CSV, newline='') as f:
-                for row in csv.reader(f):
-                    if len(row) == 3 and os.path.exists(row[0]) and os.path.exists(row[1]):
-                        feedback.append((row[0], row[1], float(row[2])))
-            if feedback:
-                log(f"Loaded {len(feedback)} human feedback pairs.")
-
-        train_pairs = official + generated + vgg_pairs + ms1mv2_pairs + celeb_pairs + feedback
-        random.shuffle(train_pairs)
-        log(f"Train: {len(train_pairs)} pairs  |  Test: {len(test_pairs)} pairs\n")
-
-        # ── build geometric feature cache ─────────────────────────────────────
-        all_paths = list({p for pair in train_pairs + test_pairs for p in pair[:2]})
-        log(f"Building feature cache for {len(all_paths)} images...")
+        # ── geometric feature cache for LFW test images only ─────────────────
+        test_img_paths = list({p for pair in test_pairs for p in pair[:2]})
+        log(f"Building feature cache for {len(test_img_paths)} LFW test images...")
 
         def feat_progress(done, total):
             if done % 500 == 0 or done == total:
                 log(f"  Features: {done}/{total}")
 
         global _feat_cache, _embed_index
-        _feat_cache = build_feature_cache(all_paths, FEAT_CACHE, progress_cb=feat_progress)
+        _feat_cache = build_feature_cache(test_img_paths, FEAT_CACHE, progress_cb=feat_progress)
         log(f"Feature cache ready ({len(_feat_cache)} entries).\n")
 
-        train_loader = DataLoader(
-            FacePairDataset(train_pairs, train_transform, feature_cache=_feat_cache),
-            batch_size=32, shuffle=True, num_workers=0)
+        # test loader is fixed for all epochs
         test_loader = DataLoader(
             FacePairDataset(test_pairs, test_transform, feature_cache=_feat_cache),
             batch_size=32, shuffle=False, num_workers=0)
 
         model = SiameseNet(embedding_size=EMBEDDING_SIZE, dropout=0.25, feat_dim=FEAT_DIM).to(DEVICE)
 
-        # Reference approach: SGD + MultiStepLR works better with large identity datasets
-        # (MS1MV2 / VGGFace2). Keep Adam + CosineAnnealingLR for small-data runs.
-        has_large_dataset = len(vgg_pairs) + len(ms1mv2_pairs) > 10000
-        if has_large_dataset:
-            optimizer      = optim.SGD(model.parameters(), lr=0.05,
-                                       momentum=0.9, weight_decay=5e-4)
-            scheduler      = optim.lr_scheduler.MultiStepLR(
-                                optimizer, milestones=[10, 20, 30], gamma=0.1)
-            optimizer_type = 'SGD'
-            log("Large dataset: SGD lr=0.05, momentum=0.9, MultiStepLR [10,20,30]×0.1")
-        else:
-            optimizer      = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
-            scheduler      = optim.lr_scheduler.CosineAnnealingLR(
-                                optimizer, T_max=300, eta_min=1e-6)
-            optimizer_type = 'Adam'
+        # SGD + MultiStepLR — same schedule as the InsightFace reference
+        optimizer_type = 'SGD'
+        optimizer  = optim.SGD(model.parameters(), lr=0.05, momentum=0.9, weight_decay=5e-4)
+        scheduler  = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 20, 30], gamma=0.1)
+        log("Optimizer: SGD lr=0.05 momentum=0.9 wd=5e-4  |  MultiStepLR [10,20,30]×0.1")
 
         start_epoch = 0
         best_acc    = 0.0
         threshold   = 0.5
 
-        if os.path.exists(APP_CHECKPOINT):
+        if start_fresh:
+            log("Starting from scratch — existing checkpoint ignored.\n")
+
+        if not start_fresh and os.path.exists(APP_CHECKPOINT):
             ckpt       = torch.load(APP_CHECKPOINT, map_location=DEVICE, weights_only=False)
             compatible = True
             try:
@@ -568,6 +528,12 @@ def _train_worker():
             if _stop_event.is_set():
                 log("Stopped by user.")
                 break
+
+            # Fresh pairs every epoch — all 85.7k identities, new random combinations
+            epoch_pairs = sample_ms1mv2_epoch_pairs(ms1mv2_persons, PAIRS_PER_ID)
+            train_loader = DataLoader(
+                FacePairDataset(epoch_pairs, train_transform, feature_cache={}),
+                batch_size=32, shuffle=True, num_workers=0)
 
             # ── train ────────────────────────────────────────────────────────
             model.train()
@@ -643,14 +609,14 @@ def _train_worker():
         raise
 
 
-def start_training():
+def start_training(start_fresh=False):
     global _train_thread
     if _train_thread and _train_thread.is_alive():
         return "Already training — check the log."
     _stop_event.clear()
     with _lock:
         _log_lines.clear()
-    _train_thread = threading.Thread(target=_train_worker, daemon=True)
+    _train_thread = threading.Thread(target=_train_worker, args=(start_fresh,), daemon=True)
     _train_thread.start()
     return "Training started."
 
