@@ -371,6 +371,40 @@ def generate_pairs_from_flat_dir(root, exclude_people, max_pos=50000):
     return all_positive + negative
 
 
+# ── 10-fold cross-validation evaluation (reference protocol) ──────────────────
+
+def k_fold_eval(all_dists, all_labels, n_folds=10):
+    """
+    10-fold cross-validation on LFW pairs — matches the reference evaluate.py.
+    Uses 9 folds to find the best threshold, evaluates on the remaining fold,
+    repeats 10 times. Returns (mean_acc, std_acc, mean_threshold).
+    """
+    n          = len(all_dists)
+    fold_size  = n // n_folds
+    thresholds = np.linspace(0.05, 1.95, 200)
+    accs, thrs = [], []
+
+    for fold in range(n_folds):
+        test_idx  = list(range(fold * fold_size, (fold + 1) * fold_size))
+        train_idx = [i for i in range(n) if i not in test_idx]
+
+        # best threshold on the 9 train folds
+        best_thr, best_acc = 0.5, 0.0
+        for thr in thresholds:
+            acc = np.mean(
+                (all_dists[train_idx] < thr) == all_labels[train_idx].astype(bool))
+            if acc > best_acc:
+                best_acc, best_thr = acc, thr
+
+        # accuracy on the held-out fold
+        acc = np.mean(
+            (all_dists[test_idx] < best_thr) == all_labels[test_idx].astype(bool))
+        accs.append(acc)
+        thrs.append(best_thr)
+
+    return float(np.mean(accs)), float(np.std(accs)), float(np.mean(thrs))
+
+
 # ── training / evaluation ─────────────────────────────────────────────────────
 
 def run_epoch(model, loader, criterion, optimizer, training):

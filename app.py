@@ -30,7 +30,7 @@ from lfw_pytorch import (
     train_transform, test_transform,
     DEVICE, EMBEDDING_SIZE, IMAGE_SIZE,
     load_csv_pairs, load_pairs_csv, generate_pairs_from_filesystem, generate_pairs_from_flat_dir,
-    get_names_from_csv,
+    get_names_from_csv, k_fold_eval,
 )
 from face_features import build_feature_cache, extract_face_features, FEAT_DIM, _ZERO_VEC, using_gpu
 from celebrity_scraper import (
@@ -174,7 +174,7 @@ def _ms1mv2_status():
 def download_ms1mv2():
     """Generator — tries Kaggle first, then shows manual download instructions."""
     yield "Searching Kaggle for MS1MV2..."
-    KAGGLE_IDS = ["tongpython/ms1m-arcface", "harrymoore/ms1m-arcface"]
+    KAGGLE_IDS = ["yakhyokhuja/ms1m-arcface-dataset", "tongpython/ms1m-arcface", "harrymoore/ms1m-arcface"]
     base = None
     for kid in KAGGLE_IDS:
         try:
@@ -422,15 +422,32 @@ def _train_worker():
             with _lock:
                 _log_lines.append(msg)
 
-        log("Loading test pairs...")
-        test_pairs  = load_csv_pairs(dp, "matchpairsDevTest.csv", "mismatchpairsDevTest.csv")
-        test_people = get_names_from_csv(dp, "peopleDevTest.csv")
+        # Reference protocol: use ALL 6,000 LFW pairs for 10-fold CV evaluation
+        log("Loading LFW test pairs (all 6,000 — reference protocol)...")
+        test_pairs = load_pairs_csv(dp, exclude_people=set())   # all 6k, no exclusions
+        if not test_pairs:
+            # fallback if pairs.csv missing
+            test_pairs = load_csv_pairs(dp, "matchpairsDevTest.csv", "mismatchpairsDevTest.csv")
+            log(f"  pairs.csv not found — using DevTest ({len(test_pairs)} pairs)")
+        else:
+            log(f"  {len(test_pairs)} pairs loaded for 10-fold CV")
+
+        # Exclude ALL LFW evaluation people from training to prevent leakage
+        test_people = set()
+        for p1, p2, _ in test_pairs:
+            test_people.add(os.path.basename(os.path.dirname(p1)))
+            test_people.add(os.path.basename(os.path.dirname(p2)))
+        log(f"  Protecting {len(test_people)} LFW people from training data")
 
         log("Loading LFW train pairs...")
+        # DevTrain / auto-generated only for people NOT in the test set
         official  = load_csv_pairs(dp, "matchpairsDevTrain.csv", "mismatchpairsDevTrain.csv")
-        pairs_csv = load_pairs_csv(dp, exclude_people=test_people)
+        # filter official to exclude test people
+        official  = [(p1, p2, l) for p1, p2, l in official
+                     if os.path.basename(os.path.dirname(p1)) not in test_people
+                     and os.path.basename(os.path.dirname(p2)) not in test_people]
         generated = generate_pairs_from_filesystem(dp, exclude_people=test_people, max_pos=15000)
-        log(f"  DevTrain CSV: {len(official)}  |  pairs.csv benchmark: {len(pairs_csv)}  |  auto-generated: {len(generated)}")
+        log(f"  DevTrain CSV (filtered): {len(official)}  |  auto-generated: {len(generated)}")
 
         # VGGFace2 pairs (capped to avoid memory issues on small GPUs)
         vgg_root = _vgg_root()
@@ -465,7 +482,7 @@ def _train_worker():
             if feedback:
                 log(f"Loaded {len(feedback)} human feedback pairs.")
 
-        train_pairs = official + pairs_csv + generated + vgg_pairs + ms1mv2_pairs + celeb_pairs + feedback
+        train_pairs = official + generated + vgg_pairs + ms1mv2_pairs + celeb_pairs + feedback
         random.shuffle(train_pairs)
         log(f"Train: {len(train_pairs)} pairs  |  Test: {len(test_pairs)} pairs\n")
 
@@ -591,15 +608,11 @@ def _train_worker():
 
             all_dists     = np.array(all_dists)
             all_labels_np = np.array(all_labels_np)
-            best_thr, best_thr_acc = threshold, 0.0
-            for thr in np.linspace(0.05, 1.95, 60):
-                acc = np.mean((all_dists < thr) == all_labels_np.astype(bool))
-                if acc > best_thr_acc:
-                    best_thr_acc, best_thr = acc, thr
-            threshold = best_thr
+
+            # 10-fold cross-validation (reference protocol)
+            te_acc, te_std, threshold = k_fold_eval(all_dists, all_labels_np)
 
             tr_acc = tr_correct / tr_total
-            te_acc = best_thr_acc
             scheduler.step()
 
             if te_acc > best_acc:
@@ -619,7 +632,7 @@ def _train_worker():
 
             lr = optimizer.param_groups[0]['lr']
             log(f"Epoch {epoch:3d}  train {tr_acc*100:.1f}%  "
-                f"test {te_acc*100:.1f}%  best {best_acc*100:.1f}%  "
+                f"LFW {te_acc*100:.2f}%±{te_std*100:.2f}%  best {best_acc*100:.2f}%  "
                 f"thr {threshold:.3f}  lr={lr:.2e}")
 
         log(f"\nDone. Best test accuracy: {best_acc*100:.1f}%")
@@ -1418,6 +1431,59 @@ def run_compare_search(image):
     return "Done.", gallery_best, gallery_ckpt
 
 
+def search_and_compare(image, mode):
+    """
+    Generator — extracts face features, then searches the dataset with both
+    app_best.pt and app_checkpoint.pt side by side.
+    Requires the comparison index to be built first (start_compare_build).
+    """
+    if image is None:
+        yield "Upload a face photo first.", [], []
+        return
+
+    missing = [f for f in [APP_BEST, APP_CHECKPOINT] if not os.path.exists(f)]
+    if missing:
+        yield f"Missing: {', '.join(missing)} — train the model first.", [], []
+        return
+
+    img_pil = Image.fromarray(image).convert('RGB')
+    q_feats = extract_face_features(img_pil)
+    q_feats_search = _ZERO_VEC.copy() if mode == "CNN Only" else q_feats
+
+    diag = "── Feature Analysis ──────────────────────────────────────\n"
+    diag += _describe_features(q_feats)
+    yield diag + "\n\nLoading index...", [], []
+
+    global _embed_index_best, _embed_index_ckpt
+    if _embed_index_best is None and os.path.exists(EMBED_CACHE_BEST):
+        _embed_index_best = _load_compare_cache(EMBED_CACHE_BEST)
+    if _embed_index_ckpt is None and os.path.exists(EMBED_CACHE_CKPT):
+        _embed_index_ckpt = _load_compare_cache(EMBED_CACHE_CKPT)
+
+    if _embed_index_best is None or _embed_index_ckpt is None:
+        yield (diag + "\n\nNo index yet — click **Build Index** first.\n"
+               "This embeds all dataset images through both models (~2–4 min)."), [], []
+        return
+
+    img_t   = test_transform(img_pil).unsqueeze(0).to(DEVICE)
+    feats_t = torch.tensor(q_feats).unsqueeze(0).to(DEVICE)
+
+    model_best = _load_model_file(APP_BEST)
+    model_ckpt = _load_model_file(APP_CHECKPOINT)
+
+    with torch.no_grad():
+        q_emb_best = model_best.get_embedding(img_t, feats_t).cpu().numpy()[0]
+        q_emb_ckpt = model_ckpt.get_embedding(img_t, feats_t).cpu().numpy()[0]
+
+    g_best = _search_with_index(_embed_index_best, q_emb_best, q_feats_search)
+    g_ckpt = _search_with_index(_embed_index_ckpt, q_emb_ckpt, q_feats_search)
+
+    mode_note = {"CNN + Features": "CNN + feature re-ranking",
+                 "CNN Only":       "CNN only"}.get(mode, mode)
+    diag += f"\n\nMode: {mode_note}  |  Best: {len(g_best)} matches  |  Checkpoint: {len(g_ckpt)} matches"
+    yield diag, g_best, g_ckpt
+
+
 # ── GRADIO UI ─────────────────────────────────────────────────────────────────
 
 with gr.Blocks(title="Face Verification") as app:
@@ -1433,7 +1499,7 @@ with gr.Blocks(title="Face Verification") as app:
                 "Input size: **112×112** (MS1MV2 native). "
                 "Uses LFW + MS1MV2 + VGGFace2 + scraped celebrities + feedback labels.  \n"
                 "With MS1MV2/VGGFace2: switches to **SGD + MultiStepLR** (reference protocol). "
-                "LFW DevTest used for validation every epoch."
+                "**6,000-pair LFW 10-fold CV** used for validation every epoch (reference protocol)."
             )
             with gr.Row():
                 btn_start   = gr.Button("Start Training", variant="primary")
@@ -1477,140 +1543,67 @@ with gr.Blocks(title="Face Verification") as app:
                              outputs=ms1mv2_log, show_progress="hidden")
             btn_ms1mv2.click(lambda: _ms1mv2_status(), outputs=ms1mv2_status_box)
 
-        # ── TAB 2: SCRAPE DATA ────────────────────────────────────────────────
-        with gr.Tab("Scrape Data"):
+        # ── TAB 2: SEARCH ─────────────────────────────────────────────────────
+        with gr.Tab("Search"):
             gr.Markdown(
-                "Download celebrity face images to supplement LFW training data.  \n"
-                "Covers actors, musicians, athletes, K-pop, Bollywood, and more (~450 celebrities).  \n"
-                "**Existing images are never deleted on restart** — scraping resumes where it left off."
+                "Upload a face — searches with **both models** side by side.  \n"
+                "**Step 1:** Click *Build Index* once (~2–4 min) to index all images.  \n"
+                "**Step 2:** Upload a photo and click *Search*."
             )
-            scrape_status_box = gr.Textbox(label="Stored so far", lines=1, interactive=False)
+            srch_img  = gr.Image(label="Upload Face", type="numpy")
+            srch_mode = gr.Radio(
+                ["CNN + Features", "CNN Only"],
+                value="CNN + Features", label="Search Mode")
             with gr.Row():
-                n_slider   = gr.Slider(10, 50, value=25, step=5, label="Images per celebrity")
-                btn_scrape = gr.Button("Start Scraping", variant="primary")
-                btn_scrape_r = gr.Button("Refresh Log")
-            gr.Markdown(
-                "**Optional: AI Verification** — paste a free [Groq API key](https://console.groq.com) "
-                "to have a vision model delete wrong/non-celebrity images automatically."
-            )
-            with gr.Row():
-                groq_key_box = gr.Textbox(
-                    label="Groq API Key (optional, free at console.groq.com)",
-                    placeholder="gsk_...", type="password", scale=3)
-                btn_ai_verify = gr.Button("AI Verify Existing Images", scale=1)
-            scrape_log_box = gr.Textbox(label="Scrape Log", lines=20, interactive=False)
-
-            btn_scrape.click(start_scraping, inputs=[n_slider, groq_key_box], outputs=scrape_status_box)
-            btn_scrape_r.click(get_scrape_log, outputs=scrape_log_box)
-            btn_ai_verify.click(start_ai_verify, inputs=groq_key_box, outputs=scrape_status_box)
-            app.load(get_scrape_status, outputs=scrape_status_box)
-
-        # ── TAB 3: FIND IN DATASET ───────────────────────────────────────────
-        with gr.Tab("Find in Dataset"):
-            gr.Markdown(
-                "Upload a face — the model finds the closest matching images "
-                "from your **own dataset** (LFW + scraped celebrities).  \n"
-                "The log shows what features were detected: skin tone, hair color, "
-                "eye color, face shape, and whether they are active.  \n"
-                "*(First click builds an embedding index — ~1–2 min the first time.)*"
-            )
-            img_in      = gr.Image(label="Upload Face", type="numpy")
-            search_mode = gr.Radio(
-                ["CNN + Features", "CNN Only", "Features Only"],
-                value="CNN + Features",
-                label="Search Mode",
-            )
-            btn_id   = gr.Button("Find Matches", variant="primary")
-            diag_box = gr.Textbox(label="Feature Diagnostic & Results Log",
-                                  lines=20, interactive=False)
-            gallery  = gr.Gallery(label="Closest matches in dataset",
-                                  columns=4, height=420)
-
-            gr.Markdown("---")
-            gr.Markdown(
-                "**Build Feature Index** — runs MediaPipe on every image in the dataset "
-                "using parallel CPU workers (~2–4 min for 17K images, scales well).  \n"
-                "Run this once after building the embed cache so re-ranking has real skin/hair/shape data."
-            )
-            btn_feat  = gr.Button("Build Feature Index", variant="secondary")
-            feat_log  = gr.Textbox(label="Feature Index Log", lines=6, interactive=False)
-
-            btn_id.click(find_dataset_matches, inputs=[img_in, search_mode],
-                         outputs=[diag_box, gallery],
-                         show_progress="hidden")
-            btn_feat.click(build_feature_index, inputs=None,
-                           outputs=feat_log, show_progress="hidden")
-
-            gr.Markdown("---")
-            gr.Markdown(
-                "**CelebA Celebrity Dataset** — 202,599 aligned face images, 10,177 celebrity identities.  \n"
-                "Download once to add 50k+ celebrity faces to Ollie's lookalike search index.  \n"
-                "The search index rebuilds automatically on the next 'Find Matches' click.  \n"
-                "*(~1.5 GB — requires Kaggle API key in `~/.kaggle/kaggle.json`)*"
-            )
-            celeba_status_box = gr.Textbox(label="CelebA Status",
-                                           value=_celeba_status(), lines=1, interactive=False)
-            btn_celeba = gr.Button("Download CelebA", variant="secondary")
-            celeba_log = gr.Textbox(label="CelebA Download Log", lines=5, interactive=False)
-
-            btn_celeba.click(download_celeba, inputs=None,
-                             outputs=celeba_log, show_progress="hidden")
-            btn_celeba.click(lambda: _celeba_status(), outputs=celeba_status_box)
-
-        # ── TAB 4: FEEDBACK ───────────────────────────────────────────────────
-        with gr.Tab("Give Feedback"):
-            gr.Markdown(
-                "Verify scraped celebrity images are actually correct.  \n"
-                "Google Images sometimes downloads wrong photos — your labels fix that noise.  \n"
-                "**Scrape Data first**, then label here. Saves to `feedback_pairs.csv`."
-            )
-            btn_load = gr.Button("Load Pair", variant="primary")
-            with gr.Row():
-                fb1 = gr.Image(label="Face A", interactive=False)
-                fb2 = gr.Image(label="Face B", interactive=False)
-            fb_count = gr.Textbox(label="", lines=1, interactive=False)
-            with gr.Row():
-                btn_same = gr.Button("Same Person",      variant="primary")
-                btn_diff = gr.Button("Different People", variant="secondary")
-
-            btn_load.click(load_feedback_pair, outputs=[fb1, fb2, fb_count])
-            btn_same.click(label_same,         outputs=[fb1, fb2, fb_count])
-            btn_diff.click(label_diff,         outputs=[fb1, fb2, fb_count])
-
-        # ── TAB 5: COMPARE MODELS ─────────────────────────────────────────────
-        with gr.Tab("Compare Models"):
-            gr.Markdown(
-                "Visually compare **Best model (app_best.pt)** vs **Current checkpoint** "
-                "side by side on any photo.  \n"
-                "**Step 1:** Click *Build Comparison Index* once after training finishes "
-                "(embeds all images through both models in one pass, ~2–4 min).  \n"
-                "**Step 2:** Upload a photo and click *Compare*."
-            )
-            with gr.Row():
-                btn_build  = gr.Button("Build Comparison Index", variant="secondary")
-                btn_clog_r = gr.Button("Refresh Log")
-            cmp_status  = gr.Textbox(label="Status", lines=1, interactive=False)
-            cmp_log_box = gr.Textbox(label="Build Log", lines=5, interactive=False)
-
-            gr.Markdown("---")
-            cmp_img = gr.Image(label="Upload Face Photo", type="numpy")
-            btn_cmp = gr.Button("Compare", variant="primary")
-            cmp_result = gr.Textbox(label="", lines=1, interactive=False)
+                btn_search    = gr.Button("Search",      variant="primary")
+                btn_bld_idx   = gr.Button("Build Index", variant="secondary")
+                btn_bld_log_r = gr.Button("Refresh Log")
+            srch_diag   = gr.Textbox(label="Feature Analysis & Log", lines=14, interactive=False)
+            bld_log_box = gr.Textbox(label="Index Build Log",         lines=4,  interactive=False)
 
             with gr.Row():
                 with gr.Column():
-                    gr.Markdown("### Best Model (app_best.pt)")
-                    gallery_best_cmp = gr.Gallery(
-                        label="Best model matches", columns=5, height=300)
+                    gr.Markdown("### Best Model  (`app_best.pt`)")
+                    gallery_best_s = gr.Gallery(label="Best model", columns=4, height=380)
                 with gr.Column():
-                    gr.Markdown("### Current Checkpoint")
-                    gallery_ckpt_cmp = gr.Gallery(
-                        label="Checkpoint matches", columns=5, height=300)
+                    gr.Markdown("### Current Checkpoint  (`app_checkpoint.pt`)")
+                    gallery_ckpt_s = gr.Gallery(label="Checkpoint", columns=4, height=380)
 
-            btn_build.click(start_compare_build, outputs=cmp_status)
-            btn_clog_r.click(get_compare_log,   outputs=cmp_log_box)
-            btn_cmp.click(run_compare_search, inputs=cmp_img,
-                          outputs=[cmp_result, gallery_best_cmp, gallery_ckpt_cmp])
+            gr.Markdown("---")
+            gr.Markdown(
+                "**Build Feature Index** — runs face detection on every image so "
+                "skin/hair/age re-ranking has real data. Run once after building the search index."
+            )
+            btn_feat_s = gr.Button("Build Feature Index", variant="secondary")
+            feat_log_s = gr.Textbox(label="Feature Index Log", lines=4, interactive=False)
+
+            gr.Markdown("---")
+            gr.Markdown(
+                "**CelebA** — 10,177 celebrity identities (202k images). "
+                "Download to add them to the search index."
+            )
+            celeba_status_s = gr.Textbox(label="CelebA Status",
+                                         value=_celeba_status(), lines=1, interactive=False)
+            btn_celeba_s = gr.Button("Download CelebA", variant="secondary")
+            celeba_log_s = gr.Textbox(label="CelebA Log", lines=3, interactive=False)
+
+            btn_search.click(search_and_compare,
+                             inputs=[srch_img, srch_mode],
+                             outputs=[srch_diag, gallery_best_s, gallery_ckpt_s],
+                             show_progress="hidden")
+            btn_bld_idx.click(start_compare_build, outputs=bld_log_box)
+            btn_bld_log_r.click(get_compare_log,   outputs=bld_log_box)
+            btn_feat_s.click(build_feature_index,  outputs=feat_log_s, show_progress="hidden")
+            btn_celeba_s.click(download_celeba,    outputs=celeba_log_s, show_progress="hidden")
+            btn_celeba_s.click(lambda: _celeba_status(), outputs=celeba_status_s)
+
+        # ── SCRAPE DATA tab removed from UI — code kept in celebrity_scraper.py ──
+        # Use celebrity_scraper.py directly via CLI if scraping is needed again.
+        # The scraped images in celebrity_data/ are still picked up by training.
+
+        # ── FEEDBACK tab removed from UI — code kept below ────────────────────
+        # feedback_pairs.csv is still loaded during training automatically.
+        # Call load_feedback_pair / label_same / label_diff directly if needed.
 
 
 if __name__ == "__main__":
