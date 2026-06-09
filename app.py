@@ -607,7 +607,12 @@ def _train_worker(start_fresh=False):
             [{'params': model.parameters()}, {'params': cosface_head.parameters()}],
             lr=0.1, momentum=0.9, weight_decay=5e-4)
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 20, 25], gamma=0.1)
-        log("Optimizer: SGD lr=0.1 momentum=0.9 wd=5e-4  |  MultiStepLR [10,20,25]×0.1")
+
+        # AMP — uses FP16 Tensor Cores on CUDA (4060 Ti: 88 TFLOPS vs 22 TFLOPS FP32)
+        use_amp = DEVICE.type == 'cuda'
+        scaler  = torch.amp.GradScaler('cuda', enabled=use_amp)
+        log(f"Optimizer: SGD lr=0.1 momentum=0.9 wd=5e-4  |  MultiStepLR [10,20,25]×0.1"
+            f"  |  AMP {'ON' if use_amp else 'OFF'}")
 
         start_epoch = 0
         best_acc    = 0.0
@@ -624,10 +629,9 @@ def _train_worker(start_fresh=False):
                     model.load_state_dict(ckpt['model'], strict=False)
                     log("Architecture changed — backbone loaded, head layers start fresh.")
                 except RuntimeError:
-                    log("Checkpoint incompatible (old embedding size?) — starting fresh.")
+                    log("Checkpoint incompatible — starting fresh.")
                     ckpt = None
             if ckpt is not None:
-                # restore cosface head if it was saved and matches current n_ids
                 if 'cosface_head' in ckpt and ckpt.get('n_ids') == n_ids:
                     try:
                         cosface_head.load_state_dict(ckpt['cosface_head'])
@@ -638,6 +642,11 @@ def _train_worker(start_fresh=False):
                     scheduler.load_state_dict(ckpt['scheduler'])
                 except Exception:
                     pass
+                if 'scaler' in ckpt:
+                    try:
+                        scaler.load_state_dict(ckpt['scaler'])
+                    except Exception:
+                        pass
                 start_epoch = ckpt['epoch'] + 1
                 best_acc    = ckpt['best_acc']
                 threshold   = ckpt.get('threshold', 0.5)
@@ -653,37 +662,46 @@ def _train_worker(start_fresh=False):
                 log("Stopped by user.")
                 break
 
-            # Reshuffle all 5.8M images — different order every epoch, no identity capping
+            # Reshuffle all images — fresh order every epoch
             random.shuffle(all_samples)
             train_loader = DataLoader(
                 MS1MV2Dataset(all_samples, train_transform),
-                batch_size=256, shuffle=False, num_workers=0, pin_memory=True)
+                batch_size=256, shuffle=False, num_workers=2, pin_memory=True)
 
-            # ── train (CosFace classification) ───────────────────────────────
+            # ── train (CosFace + AMP) ─────────────────────────────────────────
             model.train()
             cosface_head.train()
             tr_correct = tr_total = 0
             for imgs, targets in train_loader:
-                imgs, targets = imgs.to(DEVICE), targets.long().to(DEVICE)
-                embs   = model.get_embedding(imgs)
-                logits = cosface_head(embs, targets)
-                loss   = criterion(logits, targets)
+                imgs    = imgs.to(DEVICE, non_blocking=True)
+                targets = targets.long().to(DEVICE, non_blocking=True)
+
+                with torch.amp.autocast(device_type=DEVICE.type, enabled=use_amp):
+                    embs   = model.get_embedding(imgs)
+                    logits = cosface_head(embs, targets)
+                    loss   = criterion(logits, targets)
+
                 optimizer.zero_grad()
-                loss.backward()
+                scaler.scale(loss).backward()
+                scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
-                optimizer.step()
+                scaler.step(optimizer)
+                scaler.update()
+
                 tr_correct += (logits.argmax(1) == targets).sum().item()
                 tr_total   += len(targets)
 
-            # ── eval (LFW 10-fold CV — pure CNN embeddings, no feats) ────────
+            # ── eval (LFW 10-fold CV) ─────────────────────────────────────────
             model.eval()
             all_dists, all_labels_np = [], []
             with torch.no_grad():
                 for img1, img2, labels in test_loader:
-                    img1, img2 = img1.to(DEVICE), img2.to(DEVICE)
-                    e1   = model.get_embedding(img1)
-                    e2   = model.get_embedding(img2)
-                    dist = F.pairwise_distance(e1, e2)
+                    img1 = img1.to(DEVICE, non_blocking=True)
+                    img2 = img2.to(DEVICE, non_blocking=True)
+                    with torch.amp.autocast(device_type=DEVICE.type, enabled=use_amp):
+                        e1 = model.get_embedding(img1)
+                        e2 = model.get_embedding(img2)
+                    dist = F.pairwise_distance(e1.float(), e2.float())
                     all_dists.extend(dist.cpu().numpy())
                     all_labels_np.extend(labels.numpy())
 
@@ -709,6 +727,7 @@ def _train_worker(start_fresh=False):
                 'cosface_head': cosface_head.state_dict(),
                 'optimizer': optimizer.state_dict(),
                 'scheduler': scheduler.state_dict(),
+                'scaler': scaler.state_dict(),
                 'best_acc': best_acc, 'threshold': threshold,
                 'n_ids': n_ids, 'optimizer_type': 'SGD',
             }, APP_CHECKPOINT)
