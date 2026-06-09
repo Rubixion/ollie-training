@@ -219,7 +219,7 @@ export function CelebrityFinder() {
                     <p className="text-white/70 font-medium">Drag &amp; drop your photo</p>
                     <p className="text-white/30 text-sm mt-1">or click to browse</p>
                   </div>
-                  <span className="text-white/20 text-xs">JPG, PNG, WEBP Â· Max 10 MB</span>
+                  <span className="text-white/20 text-xs">JPG, PNG, WEBP · Max 10 MB</span>
                 </div>
               )}
               <input
