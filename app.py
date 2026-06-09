@@ -27,7 +27,7 @@ from torch.utils.data import DataLoader
 import kagglehub
 
 from lfw_pytorch import (
-    SiameseNet, FacePairDataset, MarginCosineProduct,
+    SphereFaceNet, SiameseNet, FacePairDataset, MarginCosineProduct,
     train_transform, test_transform,
     DEVICE, EMBEDDING_SIZE, IMAGE_SIZE,
     load_csv_pairs, load_pairs_csv, generate_pairs_from_filesystem, generate_pairs_from_flat_dir,
@@ -174,13 +174,70 @@ def _ms1mv2_status():
 
 
 def download_ms1mv2():
-    """Generator — tries Kaggle first, then shows manual download instructions."""
-    yield "Searching Kaggle for MS1MV2..."
-    KAGGLE_IDS = ["yakhyokhuja/ms1m-arcface-dataset", "tongpython/ms1m-arcface", "harrymoore/ms1m-arcface"]
+    """
+    Extract MS1MV2 from the already-downloaded archive, resuming where extraction
+    was interrupted.  Falls back to kagglehub download if archive not present.
+    """
+    import zipfile
+
+    ARCHIVE = os.path.join(
+        os.path.expanduser("~"), ".cache", "kagglehub", "datasets",
+        "yakhyokhuja", "ms1m-arcface-dataset", "1.archive"
+    )
+    DEST = os.path.join(
+        os.path.expanduser("~"), ".cache", "kagglehub", "datasets",
+        "yakhyokhuja", "ms1m-arcface-dataset", "versions", "1"
+    )
+    FINAL = os.path.join(DEST, "ms1m-arcface")
+
+    # ── if archive already on disk, extract from it directly ─────────────────
+    if os.path.exists(ARCHIVE):
+        yield f"Archive found ({os.path.getsize(ARCHIVE)//1_073_741_824:.1f} GB) — extracting..."
+        os.makedirs(FINAL, exist_ok=True)
+        existing = set(os.listdir(FINAL))
+        yield f"Already extracted: {len(existing):,} identity folders — resuming..."
+
+        try:
+            with zipfile.ZipFile(ARCHIVE) as zf:
+                # Group entries by identity folder name to skip whole folders at once
+                entries_by_id = {}
+                for name in zf.namelist():
+                    parts = name.split('/')
+                    if len(parts) >= 3:                # ms1m-arcface/<id>/<file>
+                        entries_by_id.setdefault(parts[1], []).append(name)
+
+                total_ids  = len(entries_by_id)
+                done_ids   = 0
+                new_ids    = 0
+                for identity, entries in entries_by_id.items():
+                    if identity in existing:
+                        done_ids += 1
+                        continue
+                    for entry in entries:
+                        zf.extract(entry, DEST)
+                    existing.add(identity)
+                    done_ids += 1
+                    new_ids  += 1
+                    if new_ids % 500 == 0 or done_ids == total_ids:
+                        yield f"  {done_ids:,}/{total_ids:,} identities extracted..."
+
+        except Exception as e:
+            yield f"Extraction error: {e}"
+            return
+
+        with open(MS1MV2_PATH_FILE, 'w') as f:
+            f.write(FINAL)
+        yield f"Done — {len(os.listdir(FINAL)):,} identities at {FINAL}"
+        yield _ms1mv2_status()
+        return
+
+    # ── archive not present — try kagglehub download ──────────────────────────
+    yield "Archive not found locally — trying Kaggle download (15 GB)..."
+    KAGGLE_IDS = ["yakhyokhuja/ms1m-arcface-dataset"]
     base = None
     for kid in KAGGLE_IDS:
         try:
-            yield f"Trying {kid} ..."
+            yield f"Downloading {kid} ..."
             base = kagglehub.dataset_download(kid)
             yield f"Downloaded to: {base}"
             break
@@ -189,16 +246,24 @@ def download_ms1mv2():
 
     if base is None:
         yield (
-            "MS1MV2 not found on Kaggle automatically.\n\n"
-            "Manual setup (recommended):\n"
-            "1. Download MS1M-RetinaFace from InsightFace:\n"
-            "   github.com/deepinsight/insightface → recognition → _datasets_\n"
-            "   (look for 'faces_ms1m-refine-v2' or 'MS1M-ArcFace')\n"
-            "2. Extract so each identity is a subfolder with its images\n"
-            "3. Create ms1mv2_path.txt in this folder containing the path\n\n"
-            "Or search Kaggle for 'ms1m face recognition 112x112'."
+            "Download failed.\n\n"
+            "Manual setup:\n"
+            "1. Download from Kaggle: yakhyokhuja/ms1m-arcface-dataset\n"
+            "2. Extract so each identity is a subfolder under a single root\n"
+            f"3. Write that root path into ms1mv2_path.txt"
         )
         return
+
+    # kagglehub extracted it — find the identity folder root
+    for candidate in [base, os.path.join(base, "ms1m-arcface")]:
+        if os.path.isdir(candidate) and any(
+            os.path.isdir(os.path.join(candidate, d)) for d in os.listdir(candidate)
+        ):
+            with open(MS1MV2_PATH_FILE, 'w') as f:
+                f.write(candidate)
+            yield f"Path saved: {candidate}"
+            yield _ms1mv2_status()
+            return
 
     with open(MS1MV2_PATH_FILE, 'w') as f:
         f.write(base)
@@ -239,6 +304,16 @@ def _celeba_identity_file():
         os.path.join(base, 'identity_CelebA.txt'),
         os.path.join(base, 'celeba', 'Anno', 'identity_CelebA.txt'),
         os.path.join(base, 'list_identity_celeba.txt'),
+        # jessicali9530 dataset puts it alongside the CSVs
+        os.path.join(base, 'list_attr_celeba.csv').replace('list_attr_celeba.csv', 'identity_CelebA.txt'),
+    ]:
+        if os.path.exists(candidate):
+            return candidate
+    # also scan parent directory (kagglehub sometimes extracts alongside base)
+    parent = os.path.dirname(base)
+    for candidate in [
+        os.path.join(parent, 'identity_CelebA.txt'),
+        os.path.join(parent, 'list_identity_celeba.txt'),
     ]:
         if os.path.exists(candidate):
             return candidate
@@ -266,22 +341,74 @@ def _celeba_status():
 
 
 def download_celeba():
-    """Generator — downloads CelebA aligned faces from Kaggle."""
-    yield "Downloading CelebA (202,599 celebrity face images, 10,177 identities)..."
-    yield "This is ~1.5 GB — may take a few minutes.\n"
-    try:
-        base = kagglehub.dataset_download("jessicali9530/celeba-dataset")
-        yield f"Downloaded to: {base}"
-        with open(CELEBA_PATH_FILE, 'w') as f:
-            f.write(base)
-        yield _celeba_status()
-        yield "\nReady! Click 'Find Matches' to build the search index (includes CelebA)."
-    except Exception as e:
-        yield f"Download failed: {e}\nRequires Kaggle API key in ~/.kaggle/kaggle.json"
+    """
+    Ensures CelebA images + identity labels are present.
+    Images come from jessicali9530/celeba-dataset (already downloaded).
+    Identity labels (identity_CelebA.txt) come from a separate Kaggle source
+    if they are not already on disk.
+    """
+    base = open(CELEBA_PATH_FILE).read().strip() if os.path.exists(CELEBA_PATH_FILE) else None
+
+    # ── step 1: images ────────────────────────────────────────────────────────
+    if _celeba_root() is None:
+        yield "Downloading CelebA images (~1.5 GB)..."
+        try:
+            base = kagglehub.dataset_download("jessicali9530/celeba-dataset")
+            with open(CELEBA_PATH_FILE, 'w') as f:
+                f.write(base)
+            yield f"Images downloaded to: {base}"
+        except Exception as e:
+            yield f"Image download failed: {e}"
+            return
+    else:
+        yield f"Images already present: {_celeba_root()}"
+
+    # ── step 2: identity file ─────────────────────────────────────────────────
+    if _celeba_identity_file() is not None:
+        yield f"Identity file already present: {_celeba_identity_file()}"
+    else:
+        yield "identity_CelebA.txt not found — fetching from Kaggle..."
+        identity_dest = os.path.join(base or open(CELEBA_PATH_FILE).read().strip(), 'identity_CelebA.txt')
+        # Try several Kaggle datasets known to carry the CelebA identity annotations
+        IDENTITY_SOURCES = [
+            "nroman/celeba",
+            "jessicali9530/celeba-dataset",
+        ]
+        got_identity = False
+        for kid in IDENTITY_SOURCES:
+            try:
+                yield f"  Trying {kid} ..."
+                id_base = kagglehub.dataset_download(kid)
+                # search recursively for the identity file
+                for root_d, _, files in os.walk(id_base):
+                    for fn in files:
+                        if fn.lower() in ('identity_celeba.txt', 'list_identity_celeba.txt'):
+                            import shutil
+                            shutil.copy(os.path.join(root_d, fn), identity_dest)
+                            yield f"  Copied {fn} → {identity_dest}"
+                            got_identity = True
+                            break
+                    if got_identity:
+                        break
+            except Exception as e:
+                yield f"  {kid}: {e}"
+            if got_identity:
+                break
+
+        if not got_identity:
+            yield (
+                "Could not fetch identity_CelebA.txt automatically.\n"
+                "Download it manually from the official CelebA Google Drive:\n"
+                "  drive.google.com/drive/folders/0B7EVK8r0v71pOC0wOVZlQnFfaGs\n"
+                f"Place it at: {identity_dest}\n"
+                "CelebA images are still usable — search will show individual images."
+            )
+
+    yield _celeba_status()
 
 
 def _load_model(path=None):
-    model = SiameseNet(embedding_size=EMBEDDING_SIZE, dropout=0.25, feat_dim=FEAT_DIM).to(DEVICE)
+    model = SphereFaceNet(EMBEDDING_SIZE).to(DEVICE)
     src = path or (APP_BEST if os.path.exists(APP_BEST) else
                    (APP_CHECKPOINT if os.path.exists(APP_CHECKPOINT) else None))
     if src:
@@ -457,24 +584,23 @@ def _train_worker(start_fresh=False):
         n_ids  = len(ms1mv2_persons)
         n_imgs = sum(len(v) for v in ms1mv2_persons.values())
         log(f"  {n_ids:,} identities  |  {n_imgs:,} images")
-        IMGS_PER_ID = 5   # images sampled per identity per epoch
-        log(f"  {IMGS_PER_ID} imgs/identity → ~{n_ids * IMGS_PER_ID:,} images per epoch\n")
 
-        def _sample_epoch(n_per_id):
-            """Sample n_per_id images from each identity; returns [(path, class_idx)]."""
-            out = []
-            for class_idx, (_, imgs) in enumerate(ms1mv2_persons.items()):
-                chosen = random.sample(imgs, min(n_per_id, len(imgs)))
-                for p in chosen:
-                    out.append((p, class_idx))
-            random.shuffle(out)
-            return out
+        # Build the full flat sample list once — all images, every epoch (matches reference)
+        log("  Building sample list (all images)...")
+        all_samples = []
+        for class_idx, (_, imgs) in enumerate(ms1mv2_persons.items()):
+            for p in imgs:
+                all_samples.append((p, class_idx))
+        log(f"  {len(all_samples):,} images per epoch  ({len(all_samples)//256:,} batches at bs=256)\n")
 
         # ── model + CosFace head ──────────────────────────────────────────────
         global _feat_cache, _embed_index
-        model        = SiameseNet(embedding_size=EMBEDDING_SIZE, dropout=0.25, feat_dim=FEAT_DIM).to(DEVICE)
+        model        = SphereFaceNet(EMBEDDING_SIZE).to(DEVICE)
         cosface_head = MarginCosineProduct(EMBEDDING_SIZE, n_ids).to(DEVICE)
         criterion    = nn.CrossEntropyLoss()
+
+        n_params = sum(p.numel() for p in model.parameters()) / 1e6
+        log(f"Model: SphereFaceNet  ({n_params:.1f}M params)")
 
         # SGD lr=0.1 — matches reference exactly
         optimizer = optim.SGD(
@@ -527,11 +653,11 @@ def _train_worker(start_fresh=False):
                 log("Stopped by user.")
                 break
 
-            # Fresh sample of images every epoch — covers all identities, new combos
-            samples = _sample_epoch(IMGS_PER_ID)
+            # Reshuffle all 5.8M images — different order every epoch, no identity capping
+            random.shuffle(all_samples)
             train_loader = DataLoader(
-                MS1MV2Dataset(samples, train_transform),
-                batch_size=256, shuffle=True, num_workers=0, pin_memory=True)
+                MS1MV2Dataset(all_samples, train_transform),
+                batch_size=256, shuffle=False, num_workers=0, pin_memory=True)
 
             # ── train (CosFace classification) ───────────────────────────────
             model.train()
@@ -1181,8 +1307,8 @@ def label_diff():
 # ── COMPARE MODELS TAB ────────────────────────────────────────────────────────
 
 def _load_model_file(path: str):
-    """Load a SiameseNet from a path — handles both bare state-dict and full checkpoint."""
-    m = SiameseNet(embedding_size=EMBEDDING_SIZE, dropout=0.25, feat_dim=FEAT_DIM).to(DEVICE)
+    """Load a SphereFaceNet from a path — handles both bare state-dict and full checkpoint."""
+    m = SphereFaceNet(EMBEDDING_SIZE).to(DEVICE)
     raw = torch.load(path, map_location=DEVICE, weights_only=False)
     state = raw['model'] if isinstance(raw, dict) and 'model' in raw else raw
     try:

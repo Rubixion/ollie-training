@@ -125,6 +125,63 @@ class MS1MV2Dataset(Dataset):
 
 # ── model ──────────────────────────────────────────────────────────────────────
 
+# ── SphereFace (sphere20) ──────────────────────────────────────────────────────
+
+class _SFBlock(nn.Module):
+    """sphere20 residual block — identity skip, PReLU, no BatchNorm."""
+    def __init__(self, channels):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(channels, channels, 3, padding=1, bias=True),
+            nn.PReLU(channels),
+            nn.Conv2d(channels, channels, 3, padding=1, bias=True),
+            nn.PReLU(channels),
+        )
+
+    def forward(self, x):
+        return x + self.block(x)
+
+
+def _sf_stage(in_ch, out_ch, n_blocks):
+    layers = [nn.Conv2d(in_ch, out_ch, 3, stride=2, padding=1, bias=True),
+              nn.PReLU(out_ch)]
+    for _ in range(n_blocks):
+        layers.append(_SFBlock(out_ch))
+    return nn.Sequential(*layers)
+
+
+class SphereFaceNet(nn.Module):
+    """
+    sphere20 backbone: 4 stride-2 stages + PReLU, preserves 7×7 spatial map,
+    flattens to 25,088 before FC.  Matches the reference train.py architecture.
+    Input: 112×112 pre-aligned faces.  Output: L2-normalised 512-d embedding.
+    The optional `feats` argument is accepted but ignored — geometric features
+    are used for search re-ranking outside the model.
+    """
+    def __init__(self, embedding_size=EMBEDDING_SIZE):
+        super().__init__()
+        self.layer1 = _sf_stage(3,   64,  1)   # 112→56
+        self.layer2 = _sf_stage(64,  128, 2)   # 56→28
+        self.layer3 = _sf_stage(128, 256, 4)   # 28→14
+        self.layer4 = _sf_stage(256, 512, 1)   # 14→7
+        self.fc     = nn.Linear(512 * 7 * 7, embedding_size, bias=True)
+        self.bn     = nn.BatchNorm1d(embedding_size)
+        for m in self.modules():
+            if isinstance(m, (nn.Conv2d, nn.Linear)):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0.0)
+
+    def get_embedding(self, x, feats=None):   # feats ignored — pure CNN path
+        x = self.layer4(self.layer3(self.layer2(self.layer1(x))))
+        return F.normalize(self.bn(self.fc(torch.flatten(x, 1))), p=2, dim=1)
+
+    def forward(self, x):
+        return self.get_embedding(x)
+
+
+# ── legacy Siamese backbone (kept for reference) ───────────────────────────────
+
 class _ResBlock(nn.Module):
     """Two 3×3 convs with a residual skip. stride=2 halves spatial dimensions."""
     def __init__(self, ch_in, ch_out, stride=1):
