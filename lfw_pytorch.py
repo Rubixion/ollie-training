@@ -25,30 +25,48 @@ import torchvision.transforms as T
 from PIL import Image
 
 DEVICE         = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-IMAGE_SIZE     = 96    # larger input gives the residual backbone more signal
+IMAGE_SIZE     = 112   # MS1MV2 native alignment size (112×112 pre-cropped faces)
 EMBEDDING_SIZE = 256   # exported so app.py stays in sync
 
 
 # ── transforms ────────────────────────────────────────────────────────────────
 
 train_transform = T.Compose([
-    T.Resize(IMAGE_SIZE + 20),
-    T.RandomCrop(IMAGE_SIZE),               # spatial augmentation
+    T.Resize(IMAGE_SIZE + 8),               # 120 — tight pad; MS1MV2 is pre-aligned at 112
+    T.RandomCrop(IMAGE_SIZE),               # 112
     T.RandomHorizontalFlip(),
-    T.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.3, hue=0.05),
-    T.RandomGrayscale(p=0.1),               # teaches shape over colour
-    T.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0)),
-    T.RandomAffine(degrees=15, translate=(0.05, 0.05), scale=(0.9, 1.1)),
+    T.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.2, hue=0.05),
+    T.RandomGrayscale(p=0.05),
     T.ToTensor(),
     T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
 ])
 
 test_transform = T.Compose([
-    T.Resize(IMAGE_SIZE + 20),
+    T.Resize(IMAGE_SIZE),
     T.CenterCrop(IMAGE_SIZE),
     T.ToTensor(),
     T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
 ])
+
+
+# ── margin cosine loss (CosFace) — for classification-based pre-training ──────
+
+class MarginCosineProduct(nn.Module):
+    """CosFace: Large Margin Cosine Loss.
+    Used when training with per-identity class labels (e.g. MS1MV2).
+    s=30 and m=0.40 are the standard values for face recognition.
+    """
+    def __init__(self, in_features, out_features, s=30.0, m=0.40):
+        super().__init__()
+        self.s = s
+        self.m = m
+        self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
+        nn.init.xavier_uniform_(self.weight)
+
+    def forward(self, embeddings, labels):
+        cosine  = F.linear(F.normalize(embeddings), F.normalize(self.weight))
+        one_hot = F.one_hot(labels.long(), num_classes=self.weight.size(0)).float()
+        return self.s * (cosine - one_hot * self.m)
 
 
 # ── dataset ───────────────────────────────────────────────────────────────────

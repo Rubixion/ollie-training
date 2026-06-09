@@ -13,6 +13,7 @@ import csv
 import random
 import threading
 import logging
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 import faiss
@@ -44,7 +45,9 @@ EMBED_CACHE         = "embed_cache.npz"
 EMBED_CACHE_BEST    = "embed_cache_best.npz"
 EMBED_CACHE_CKPT    = "embed_cache_compare.npz"
 FEAT_CACHE     = "feature_cache.pkl"
-VGG_PATH_FILE  = "vggface2_path.txt"   # persists the kagglehub download location
+VGG_PATH_FILE    = "vggface2_path.txt"    # persists the kagglehub download location
+MS1MV2_PATH_FILE = "ms1mv2_path.txt"     # path to MS1MV2 112x112 dataset
+CELEBA_PATH_FILE = "celeba_path.txt"     # path to CelebA aligned faces
 MARGIN         = 2.0
 
 
@@ -139,6 +142,140 @@ def download_vggface2():
         f.write(base)
 
     yield _vgg_status()
+
+
+# ── MS1MV2 ────────────────────────────────────────────────────────────────────
+
+def _ms1mv2_root():
+    """Return the MS1MV2 training directory, or None if not set up."""
+    if not os.path.exists(MS1MV2_PATH_FILE):
+        return None
+    base = open(MS1MV2_PATH_FILE).read().strip()
+    if not os.path.isdir(base):
+        return None
+    for candidate in [base, os.path.join(base, 'train'), os.path.join(base, 'images')]:
+        if not os.path.isdir(candidate):
+            continue
+        # MS1MV2 has 85k+ identity subdirs
+        n = sum(1 for e in os.scandir(candidate) if e.is_dir())
+        if n > 1000:
+            return candidate
+    return None
+
+
+def _ms1mv2_status():
+    root = _ms1mv2_root()
+    if root is None:
+        return "MS1MV2: not set up  —  click button below for instructions"
+    n = sum(1 for e in os.scandir(root) if e.is_dir())
+    return f"MS1MV2: {n:,} identities  ({root})"
+
+
+def download_ms1mv2():
+    """Generator — tries Kaggle first, then shows manual download instructions."""
+    yield "Searching Kaggle for MS1MV2..."
+    KAGGLE_IDS = ["tongpython/ms1m-arcface", "harrymoore/ms1m-arcface"]
+    base = None
+    for kid in KAGGLE_IDS:
+        try:
+            yield f"Trying {kid} ..."
+            base = kagglehub.dataset_download(kid)
+            yield f"Downloaded to: {base}"
+            break
+        except Exception as e:
+            yield f"  {kid}: {e}"
+
+    if base is None:
+        yield (
+            "MS1MV2 not found on Kaggle automatically.\n\n"
+            "Manual setup (recommended):\n"
+            "1. Download MS1M-RetinaFace from InsightFace:\n"
+            "   github.com/deepinsight/insightface → recognition → _datasets_\n"
+            "   (look for 'faces_ms1m-refine-v2' or 'MS1M-ArcFace')\n"
+            "2. Extract so each identity is a subfolder with its images\n"
+            "3. Create ms1mv2_path.txt in this folder containing the path\n\n"
+            "Or search Kaggle for 'ms1m face recognition 112x112'."
+        )
+        return
+
+    with open(MS1MV2_PATH_FILE, 'w') as f:
+        f.write(base)
+    yield _ms1mv2_status()
+
+
+# ── CelebA ────────────────────────────────────────────────────────────────────
+
+def _celeba_root():
+    """Return the CelebA aligned image directory, or None if not available."""
+    if not os.path.exists(CELEBA_PATH_FILE):
+        return None
+    base = open(CELEBA_PATH_FILE).read().strip()
+    for candidate in [
+        os.path.join(base, 'img_align_celeba', 'img_align_celeba'),
+        os.path.join(base, 'img_align_celeba'),
+        os.path.join(base, 'celeba', 'img_align_celeba'),
+        base,
+    ]:
+        if os.path.isdir(candidate):
+            # Verify it contains jpg images
+            try:
+                sample = next((f for f in os.listdir(candidate) if f.endswith('.jpg')), None)
+                if sample:
+                    return candidate
+            except Exception:
+                pass
+    return None
+
+
+def _celeba_identity_file():
+    """Return path to CelebA identity annotation file, or None."""
+    if not os.path.exists(CELEBA_PATH_FILE):
+        return None
+    base = open(CELEBA_PATH_FILE).read().strip()
+    for candidate in [
+        os.path.join(base, 'Anno', 'identity_CelebA.txt'),
+        os.path.join(base, 'identity_CelebA.txt'),
+        os.path.join(base, 'celeba', 'Anno', 'identity_CelebA.txt'),
+        os.path.join(base, 'list_identity_celeba.txt'),
+    ]:
+        if os.path.exists(candidate):
+            return candidate
+    return None
+
+
+def _celeba_status():
+    root = _celeba_root()
+    if root is None:
+        return "CelebA: not downloaded"
+    try:
+        n_imgs = sum(1 for f in os.listdir(root) if f.endswith('.jpg'))
+    except Exception:
+        n_imgs = 0
+    id_info = ""
+    id_file = _celeba_identity_file()
+    if id_file:
+        try:
+            ids = {line.strip().split()[1] for line in open(id_file)
+                   if len(line.strip().split()) == 2}
+            id_info = f"  |  {len(ids):,} identities"
+        except Exception:
+            pass
+    return f"CelebA: {n_imgs:,} images{id_info}  ({root})"
+
+
+def download_celeba():
+    """Generator — downloads CelebA aligned faces from Kaggle."""
+    yield "Downloading CelebA (202,599 celebrity face images, 10,177 identities)..."
+    yield "This is ~1.5 GB — may take a few minutes.\n"
+    try:
+        base = kagglehub.dataset_download("jessicali9530/celeba-dataset")
+        yield f"Downloaded to: {base}"
+        with open(CELEBA_PATH_FILE, 'w') as f:
+            f.write(base)
+        yield _celeba_status()
+        yield "\nReady! Click 'Find Matches' to build the search index (includes CelebA)."
+    except Exception as e:
+        yield f"Download failed: {e}\nRequires Kaggle API key in ~/.kaggle/kaggle.json"
 
 
 def _load_model(path=None):
@@ -305,6 +442,16 @@ def _train_worker():
         else:
             vgg_pairs = []
 
+        # MS1MV2 pairs — 85.7k identities, 5.8M images (InsightFace standard)
+        ms1mv2_root = _ms1mv2_root()
+        if ms1mv2_root:
+            log("Loading MS1MV2 pairs (85.7k identities — may take ~30 sec)...")
+            ms1mv2_pairs = generate_pairs_from_flat_dir(
+                ms1mv2_root, exclude_people=test_people, max_pos=300000)
+            log(f"  MS1MV2: {len(ms1mv2_pairs)} pairs from {ms1mv2_root}")
+        else:
+            ms1mv2_pairs = []
+
         celeb_pairs = get_scraped_pairs(SCRAPE_ROOT)
         if celeb_pairs:
             log(f"Using {len(celeb_pairs)} scraped celebrity pairs.")
@@ -318,7 +465,7 @@ def _train_worker():
             if feedback:
                 log(f"Loaded {len(feedback)} human feedback pairs.")
 
-        train_pairs = official + pairs_csv + generated + vgg_pairs + celeb_pairs + feedback
+        train_pairs = official + pairs_csv + generated + vgg_pairs + ms1mv2_pairs + celeb_pairs + feedback
         random.shuffle(train_pairs)
         log(f"Train: {len(train_pairs)} pairs  |  Test: {len(test_pairs)} pairs\n")
 
@@ -341,9 +488,24 @@ def _train_worker():
             FacePairDataset(test_pairs, test_transform, feature_cache=_feat_cache),
             batch_size=32, shuffle=False, num_workers=0)
 
-        model     = SiameseNet(embedding_size=EMBEDDING_SIZE, dropout=0.25, feat_dim=FEAT_DIM).to(DEVICE)
-        optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=300, eta_min=1e-6)
+        model = SiameseNet(embedding_size=EMBEDDING_SIZE, dropout=0.25, feat_dim=FEAT_DIM).to(DEVICE)
+
+        # Reference approach: SGD + MultiStepLR works better with large identity datasets
+        # (MS1MV2 / VGGFace2). Keep Adam + CosineAnnealingLR for small-data runs.
+        has_large_dataset = len(vgg_pairs) + len(ms1mv2_pairs) > 10000
+        if has_large_dataset:
+            optimizer      = optim.SGD(model.parameters(), lr=0.05,
+                                       momentum=0.9, weight_decay=5e-4)
+            scheduler      = optim.lr_scheduler.MultiStepLR(
+                                optimizer, milestones=[10, 20, 30], gamma=0.1)
+            optimizer_type = 'SGD'
+            log("Large dataset: SGD lr=0.05, momentum=0.9, MultiStepLR [10,20,30]×0.1")
+        else:
+            optimizer      = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+            scheduler      = optim.lr_scheduler.CosineAnnealingLR(
+                                optimizer, T_max=300, eta_min=1e-6)
+            optimizer_type = 'Adam'
+
         start_epoch = 0
         best_acc    = 0.0
         threshold   = 0.5
@@ -367,11 +529,15 @@ def _train_worker():
                     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=150, eta_min=1e-6)
                     log("Fine-tuning from pre-trained model — lr=1e-4, T_max=150\n")
                 else:
-                    try:
-                        optimizer.load_state_dict(ckpt['optimizer'])
-                        scheduler.load_state_dict(ckpt['scheduler'])
-                    except Exception:
-                        pass
+                    # Only restore optimizer state when the type matches (Adam↔SGD incompatible)
+                    if ckpt.get('optimizer_type', 'Adam') == optimizer_type:
+                        try:
+                            optimizer.load_state_dict(ckpt['optimizer'])
+                            scheduler.load_state_dict(ckpt['scheduler'])
+                        except Exception:
+                            pass
+                    else:
+                        log(f"Optimizer changed ({ckpt.get('optimizer_type','Adam')} → {optimizer_type}) — using fresh optimizer.")
                 start_epoch = ckpt['epoch'] + 1
                 best_acc    = ckpt['best_acc']
                 threshold   = ckpt.get('threshold', 0.5)
@@ -448,6 +614,7 @@ def _train_worker():
                 'optimizer': optimizer.state_dict(),
                 'scheduler': scheduler.state_dict(),
                 'best_acc': best_acc, 'threshold': threshold,
+                'optimizer_type': optimizer_type,
             }, APP_CHECKPOINT)
 
             lr = optimizer.param_groups[0]['lr']
@@ -608,20 +775,26 @@ def _build_embed_index(status_cb=None):
         return _embed_index
 
     if os.path.exists(EMBED_CACHE):
-        if status_cb:
-            status_cb("Loading cached embedding index...")
-        d     = np.load(EMBED_CACHE, allow_pickle=True)
-        names = d['names'].tolist()
-        paths = d['paths'].tolist()
-        embs  = d['embeddings'].astype(np.float32)
-        raw   = d['features'] if 'features' in d else None
-        feats = (raw if raw is not None and raw.shape[1] == FEAT_DIM
-                 else np.zeros((len(names), FEAT_DIM), dtype=np.float32))
-        fidx  = _build_faiss(embs)
-        _embed_index = (names, paths, fidx, feats)
-        if status_cb:
-            status_cb(f"Index loaded: {len(names)} images  (FAISS ready).")
-        return _embed_index
+        d = np.load(EMBED_CACHE, allow_pickle=True)
+        cached_size = int(d['image_size']) if 'image_size' in d else 96
+        if cached_size != IMAGE_SIZE:
+            if status_cb:
+                status_cb(f"Cache built at {cached_size}px, model now uses {IMAGE_SIZE}px — rebuilding...")
+            os.remove(EMBED_CACHE)
+        else:
+            if status_cb:
+                status_cb("Loading cached embedding index...")
+            names = d['names'].tolist()
+            paths = d['paths'].tolist()
+            embs  = d['embeddings'].astype(np.float32)
+            raw   = d['features'] if 'features' in d else None
+            feats = (raw if raw is not None and raw.shape[1] == FEAT_DIM
+                     else np.zeros((len(names), FEAT_DIM), dtype=np.float32))
+            fidx  = _build_faiss(embs)
+            _embed_index = (names, paths, fidx, feats)
+            if status_cb:
+                status_cb(f"Index loaded: {len(names)} images  (FAISS ready).")
+            return _embed_index
 
     model      = _load_model()
     feat_cache = _get_feat_cache()
@@ -649,6 +822,37 @@ def _build_embed_index(status_cb=None):
                 if os.path.splitext(fname)[1].lower() in IMG_EXTS:
                     all_names.append(celeb)
                     all_paths.append(os.path.join(folder, fname))
+
+    # CelebA — 10,177 celebrity identities for Ollie's lookalike search
+    celeba_dir = _celeba_root()
+    celeba_id_file = _celeba_identity_file()
+    if celeba_dir:
+        if status_cb:
+            status_cb("Adding CelebA celebrity faces to search index...")
+        if celeba_id_file:
+            # Group images by identity, sample up to 5 per identity to keep index manageable
+            img_to_id = {}
+            with open(celeba_id_file) as _f:
+                for _line in _f:
+                    _parts = _line.strip().split()
+                    if len(_parts) == 2:
+                        img_to_id[_parts[0]] = f"celeb_{_parts[1]}"
+            id_to_imgs = defaultdict(list)
+            for _fname, _identity in img_to_id.items():
+                id_to_imgs[_identity].append(_fname)
+            for _identity, _fnames in id_to_imgs.items():
+                sampled = random.sample(_fnames, min(5, len(_fnames)))
+                for _fname in sampled:
+                    _fpath = os.path.join(celeba_dir, _fname)
+                    if os.path.exists(_fpath):
+                        all_names.append(_identity)
+                        all_paths.append(_fpath)
+        else:
+            # No identity file — add all images
+            for _fname in sorted(os.listdir(celeba_dir)):
+                if _fname.endswith('.jpg'):
+                    all_names.append('celeba')
+                    all_paths.append(os.path.join(celeba_dir, _fname))
 
     total = len(all_paths)
     if status_cb:
@@ -682,7 +886,8 @@ def _build_embed_index(status_cb=None):
              names=np.array(all_names, dtype=object),
              paths=np.array(all_paths, dtype=object),
              embeddings=embeddings,
-             features=features_arr)
+             features=features_arr,
+             image_size=np.array(IMAGE_SIZE))
     fidx = _build_faiss(embeddings)
     _embed_index = (all_names, all_paths, fidx, features_arr)
     if status_cb:
@@ -1225,7 +1430,10 @@ with gr.Blocks(title="Face Verification") as app:
             gr.Markdown(
                 "Trains with **contrastive loss** + **geometric face features** "
                 "(inter-eye distance, iris colour & texture, eye aspect ratio).  \n"
-                "Uses LFW + scraped celebrity data + your feedback labels."
+                "Input size: **112×112** (MS1MV2 native). "
+                "Uses LFW + MS1MV2 + VGGFace2 + scraped celebrities + feedback labels.  \n"
+                "With MS1MV2/VGGFace2: switches to **SGD + MultiStepLR** (reference protocol). "
+                "LFW DevTest used for validation every epoch."
             )
             with gr.Row():
                 btn_start   = gr.Button("Start Training", variant="primary")
@@ -1252,6 +1460,22 @@ with gr.Blocks(title="Face Verification") as app:
             btn_vgg.click(download_vggface2, inputs=None,
                           outputs=vgg_log, show_progress="hidden")
             btn_vgg.click(lambda: _vgg_status(), outputs=vgg_status_box)
+
+            gr.Markdown("---")
+            gr.Markdown(
+                "**MS1MV2 (MS1M-ArcFace)** — 5.8M images across 85,742 identities at 112×112.  \n"
+                "The gold standard for face recognition training (InsightFace dataset).  \n"
+                "When present: switches to **SGD + MultiStepLR** (reference training protocol).  \n"
+                "*(Large download ~35 GB — see button for Kaggle / manual instructions.)*"
+            )
+            ms1mv2_status_box = gr.Textbox(label="MS1MV2 Status",
+                                           value=_ms1mv2_status(), lines=1, interactive=False)
+            btn_ms1mv2 = gr.Button("Download MS1MV2 / Setup Instructions", variant="secondary")
+            ms1mv2_log = gr.Textbox(label="MS1MV2 Log", lines=7, interactive=False)
+
+            btn_ms1mv2.click(download_ms1mv2, inputs=None,
+                             outputs=ms1mv2_log, show_progress="hidden")
+            btn_ms1mv2.click(lambda: _ms1mv2_status(), outputs=ms1mv2_status_box)
 
         # ── TAB 2: SCRAPE DATA ────────────────────────────────────────────────
         with gr.Tab("Scrape Data"):
@@ -1316,6 +1540,22 @@ with gr.Blocks(title="Face Verification") as app:
                          show_progress="hidden")
             btn_feat.click(build_feature_index, inputs=None,
                            outputs=feat_log, show_progress="hidden")
+
+            gr.Markdown("---")
+            gr.Markdown(
+                "**CelebA Celebrity Dataset** — 202,599 aligned face images, 10,177 celebrity identities.  \n"
+                "Download once to add 50k+ celebrity faces to Ollie's lookalike search index.  \n"
+                "The search index rebuilds automatically on the next 'Find Matches' click.  \n"
+                "*(~1.5 GB — requires Kaggle API key in `~/.kaggle/kaggle.json`)*"
+            )
+            celeba_status_box = gr.Textbox(label="CelebA Status",
+                                           value=_celeba_status(), lines=1, interactive=False)
+            btn_celeba = gr.Button("Download CelebA", variant="secondary")
+            celeba_log = gr.Textbox(label="CelebA Download Log", lines=5, interactive=False)
+
+            btn_celeba.click(download_celeba, inputs=None,
+                             outputs=celeba_log, show_progress="hidden")
+            btn_celeba.click(lambda: _celeba_status(), outputs=celeba_status_box)
 
         # ── TAB 4: FEEDBACK ───────────────────────────────────────────────────
         with gr.Tab("Give Feedback"):
