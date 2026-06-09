@@ -591,7 +591,7 @@ def _train_worker(start_fresh=False):
         for class_idx, (_, imgs) in enumerate(ms1mv2_persons.items()):
             for p in imgs:
                 all_samples.append((p, class_idx))
-        log(f"  {len(all_samples):,} images per epoch  ({len(all_samples)//256:,} batches at bs=256)\n")
+        log(f"  {len(all_samples):,} images per epoch  ({len(all_samples)//512:,} batches at bs=512)\n")
 
         # ── model + CosFace head ──────────────────────────────────────────────
         global _feat_cache, _embed_index

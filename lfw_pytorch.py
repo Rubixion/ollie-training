@@ -164,7 +164,7 @@ class SphereFaceNet(nn.Module):
         self.layer3 = _sf_stage(128, 256, 4)   # 28→14
         self.layer4 = _sf_stage(256, 512, 1)   # 14→7
         self.fc     = nn.Linear(512 * 7 * 7, embedding_size, bias=True)
-        self.bn     = nn.BatchNorm1d(embedding_size)
+        self.bn     = nn.BatchNorm1d(embedding_size, eps=2e-5)
         for m in self.modules():
             if isinstance(m, (nn.Conv2d, nn.Linear)):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
