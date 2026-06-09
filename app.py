@@ -1467,6 +1467,8 @@ with gr.Blocks(title="Face Verification") as app:
                 "With MS1MV2/VGGFace2: switches to **SGD + MultiStepLR** (reference protocol). "
                 "**6,000-pair LFW 10-fold CV** used for validation every epoch (reference protocol)."
             )
+            chk_fresh = gr.Checkbox(label="Start from scratch (ignore existing checkpoint)",
+                                    value=False)
             with gr.Row():
                 btn_start   = gr.Button("Start Training", variant="primary")
                 btn_stop    = gr.Button("Stop Training",  variant="stop")
@@ -1474,7 +1476,7 @@ with gr.Blocks(title="Face Verification") as app:
             status_box = gr.Textbox(label="Status", lines=1, interactive=False)
             log_box    = gr.Textbox(label="Training Log", lines=22, interactive=False)
 
-            btn_start.click(start_training, outputs=status_box)
+            btn_start.click(start_training, inputs=chk_fresh, outputs=status_box)
             btn_stop.click(stop_training,   outputs=status_box)
             btn_refresh.click(get_log,      outputs=log_box)
 
