@@ -218,6 +218,37 @@ def load_csv_pairs(dataset_path, match_csv, mismatch_csv):
     return pairs
 
 
+def load_pairs_csv(dataset_path, exclude_people=None):
+    """Load the full 6,000-pair LFW benchmark (pairs.csv), excluding test-set people."""
+    path = find_file(dataset_path, "pairs.csv")
+    if not path or not os.path.exists(path):
+        return []
+    exclude = set(exclude_people or [])
+    pairs = []
+    with open(path, newline='') as f:
+        reader = csv.reader(f)
+        next(reader)  # skip header row
+        for row in reader:
+            non_empty = [r.strip() for r in row if r.strip()]
+            if len(non_empty) == 3:          # matched: name, num1, num2
+                name, n1, n2 = non_empty
+                if name in exclude:
+                    continue
+                p1 = lfw_img_path(dataset_path, name, n1)
+                p2 = lfw_img_path(dataset_path, name, n2)
+                if os.path.exists(p1) and os.path.exists(p2):
+                    pairs.append((p1, p2, 1.0))
+            elif len(non_empty) == 4:        # mismatched: name1, num1, name2, num2
+                name1, n1, name2, n2 = non_empty
+                if name1 in exclude or name2 in exclude:
+                    continue
+                p1 = lfw_img_path(dataset_path, name1, n1)
+                p2 = lfw_img_path(dataset_path, name2, n2)
+                if os.path.exists(p1) and os.path.exists(p2):
+                    pairs.append((p1, p2, 0.0))
+    return pairs
+
+
 def get_names_from_csv(dataset_path, csv_name):
     path = find_file(dataset_path, csv_name)
     if path is None:

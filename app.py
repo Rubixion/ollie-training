@@ -28,7 +28,7 @@ from lfw_pytorch import (
     SiameseNet, FacePairDataset,
     train_transform, test_transform,
     DEVICE, EMBEDDING_SIZE, IMAGE_SIZE,
-    load_csv_pairs, generate_pairs_from_filesystem, generate_pairs_from_flat_dir,
+    load_csv_pairs, load_pairs_csv, generate_pairs_from_filesystem, generate_pairs_from_flat_dir,
     get_names_from_csv,
 )
 from face_features import build_feature_cache, extract_face_features, FEAT_DIM, _ZERO_VEC, using_gpu
@@ -40,7 +40,9 @@ from celebrity_scraper import (
 APP_CHECKPOINT = "app_checkpoint.pt"
 APP_BEST       = "app_best.pt"
 FEEDBACK_CSV   = "feedback_pairs.csv"
-EMBED_CACHE    = "embed_cache.npz"
+EMBED_CACHE         = "embed_cache.npz"
+EMBED_CACHE_BEST    = "embed_cache_best.npz"
+EMBED_CACHE_CKPT    = "embed_cache_compare.npz"
 FEAT_CACHE     = "feature_cache.pkl"
 VGG_PATH_FILE  = "vggface2_path.txt"   # persists the kagglehub download location
 MARGIN         = 2.0
@@ -65,6 +67,10 @@ _dataset_path  = None
 _embed_index   = None          # (names, paths, embeddings_array)
 _feat_cache    = None          # dict: path -> np.array(FEAT_DIM)
 _feedback_cur  = {'p1': None, 'p2': None}
+_compare_log: list = []
+_compare_thread = None
+_embed_index_best = None
+_embed_index_ckpt = None
 
 
 def _get_dataset():
@@ -285,7 +291,9 @@ def _train_worker():
 
         log("Loading LFW train pairs...")
         official  = load_csv_pairs(dp, "matchpairsDevTrain.csv", "mismatchpairsDevTrain.csv")
-        generated = generate_pairs_from_filesystem(dp, exclude_people=test_people, max_pos=8000)
+        pairs_csv = load_pairs_csv(dp, exclude_people=test_people)
+        generated = generate_pairs_from_filesystem(dp, exclude_people=test_people, max_pos=15000)
+        log(f"  DevTrain CSV: {len(official)}  |  pairs.csv benchmark: {len(pairs_csv)}  |  auto-generated: {len(generated)}")
 
         # VGGFace2 pairs (capped to avoid memory issues on small GPUs)
         vgg_root = _vgg_root()
@@ -310,7 +318,7 @@ def _train_worker():
             if feedback:
                 log(f"Loaded {len(feedback)} human feedback pairs.")
 
-        train_pairs = official + generated + vgg_pairs + celeb_pairs + feedback
+        train_pairs = official + pairs_csv + generated + vgg_pairs + celeb_pairs + feedback
         random.shuffle(train_pairs)
         log(f"Train: {len(train_pairs)} pairs  |  Test: {len(test_pairs)} pairs\n")
 
@@ -990,6 +998,221 @@ def label_diff():
     return _submit_feedback(0.0)
 
 
+# ── COMPARE MODELS TAB ────────────────────────────────────────────────────────
+
+def _load_model_file(path: str):
+    """Load a SiameseNet from a path — handles both bare state-dict and full checkpoint."""
+    m = SiameseNet(embedding_size=EMBEDDING_SIZE, dropout=0.25, feat_dim=FEAT_DIM).to(DEVICE)
+    raw = torch.load(path, map_location=DEVICE, weights_only=False)
+    state = raw['model'] if isinstance(raw, dict) and 'model' in raw else raw
+    try:
+        m.load_state_dict(state, strict=True)
+    except RuntimeError:
+        m.load_state_dict(state, strict=False)
+    m.eval()
+    return m
+
+
+def _search_with_index(index_tuple, q_emb, q_feats):
+    """FAISS search + feature re-ranking. Returns list of (pil_img, caption) tuples."""
+    names, paths, fidx, index_features = index_tuple
+    q_emb_f = np.ascontiguousarray(q_emb.reshape(1, -1), dtype=np.float32)
+    D, I    = fidx.search(q_emb_f, 200)
+    top_idx  = I[0]
+    top_dist = np.sqrt(np.maximum(D[0], 0.0))
+
+    q_has_feats = not np.all(q_feats == 0)
+    scored = []
+    for abs_i, embed_dist in zip(top_idx, top_dist):
+        if abs_i < 0:
+            continue
+        penalty = 0.0
+        if q_has_feats:
+            c = index_features[abs_i]
+            if not np.all(c == 0):
+                skin_diff  = abs(float(q_feats[20]) - float(c[20]))
+                hh         = abs(float(q_feats[17]) - float(c[17]))
+                hair_diff  = min(hh, 1.0 - hh)
+                shape_diff = abs(float(q_feats[11]) - float(c[11]))
+                penalty    = 5.0*skin_diff + 2.0*hair_diff + shape_diff
+                if q_feats[28] > 0 and c[28] > 0:
+                    penalty += 3.0 * abs(float(q_feats[28]) - float(c[28]))
+                if q_feats[29] > 0 and c[29] > 0:
+                    penalty += 4.0 * abs(float(q_feats[29]) - float(c[29]))
+            else:
+                penalty = 0.30
+        scored.append((float(embed_dist) + penalty, abs_i, float(embed_dist)))
+
+    scored.sort(key=lambda x: x[0])
+    gallery, seen = [], {}
+    for _, abs_i, embed_dist in scored:
+        display = names[abs_i].replace('_', ' ')
+        seen[display] = seen.get(display, 0) + 1
+        if seen[display] > 2:
+            continue
+        sim_pct = max(0.0, (1.0 - embed_dist / MARGIN)) * 100
+        try:
+            gallery.append((_pil_square(Image.open(paths[abs_i]).convert('RGB'), 160),
+                            f"{display}  ({sim_pct:.0f}%)"))
+        except Exception:
+            continue
+        if len(gallery) >= 10:
+            break
+    return gallery
+
+
+def _compare_build_worker():
+    global _embed_index_best, _embed_index_ckpt
+
+    def log(msg):
+        with _lock:
+            _compare_log.append(msg)
+
+    try:
+        if not os.path.exists(APP_BEST):
+            log("ERROR: app_best.pt not found."); return
+        if not os.path.exists(APP_CHECKPOINT):
+            log("ERROR: app_checkpoint.pt not found."); return
+
+        log("Loading Best model (app_best.pt)...")
+        model_best = _load_model_file(APP_BEST)
+        log("Loading Checkpoint model (app_checkpoint.pt)...")
+        model_ckpt = _load_model_file(APP_CHECKPOINT)
+
+        feat_cache = _get_feat_cache()
+        IMG_EXTS   = {'.jpg', '.jpeg', '.png', '.webp'}
+        all_names, all_paths = [], []
+
+        root = _lfw_root()
+        if os.path.isdir(root):
+            for person in sorted(os.listdir(root)):
+                folder = os.path.join(root, person)
+                if not os.path.isdir(folder):
+                    continue
+                for fname in sorted(os.listdir(folder)):
+                    if fname.endswith('.jpg'):
+                        all_names.append(person)
+                        all_paths.append(os.path.join(folder, fname))
+
+        if os.path.isdir(SCRAPE_ROOT):
+            for celeb in sorted(os.listdir(SCRAPE_ROOT)):
+                folder = os.path.join(SCRAPE_ROOT, celeb)
+                if not os.path.isdir(folder):
+                    continue
+                for fname in sorted(os.listdir(folder)):
+                    if os.path.splitext(fname)[1].lower() in IMG_EXTS:
+                        all_names.append(celeb)
+                        all_paths.append(os.path.join(folder, fname))
+
+        total = len(all_paths)
+        log(f"Embedding {total} images through both models in one pass — ~2-4 min...")
+
+        all_embs_best, all_embs_ckpt, all_feats = [], [], []
+        for i in range(0, total, 64):
+            batch_paths = all_paths[i:i+64]
+            imgs, batch_feats = [], []
+            for p in batch_paths:
+                try:
+                    imgs.append(test_transform(Image.open(p).convert('RGB')))
+                except Exception:
+                    imgs.append(test_transform(Image.new('RGB', (IMAGE_SIZE, IMAGE_SIZE))))
+                batch_feats.append(feat_cache.get(p, _ZERO_VEC))
+
+            feat_arr = np.stack(batch_feats).astype(np.float32)
+            imgs_t   = torch.stack(imgs).to(DEVICE)
+            feats_t  = torch.tensor(feat_arr).to(DEVICE)
+            with torch.no_grad():
+                all_embs_best.append(model_best.get_embedding(imgs_t, feats_t).cpu().numpy())
+                all_embs_ckpt.append(model_ckpt.get_embedding(imgs_t, feats_t).cpu().numpy())
+            all_feats.append(feat_arr)
+
+            if i % (64 * 20) == 0 and i > 0:
+                log(f"  {min(i + 64, total)}/{total} embedded...")
+
+        embs_best = np.concatenate(all_embs_best, axis=0).astype(np.float32)
+        embs_ckpt = np.concatenate(all_embs_ckpt, axis=0).astype(np.float32)
+        feats_arr = np.concatenate(all_feats, axis=0)
+        names_arr = np.array(all_names, dtype=object)
+        paths_arr = np.array(all_paths, dtype=object)
+
+        log("Saving caches and building FAISS indices...")
+        np.savez(EMBED_CACHE_BEST, names=names_arr, paths=paths_arr,
+                 embeddings=embs_best, features=feats_arr)
+        np.savez(EMBED_CACHE_CKPT, names=names_arr, paths=paths_arr,
+                 embeddings=embs_ckpt, features=feats_arr)
+
+        _embed_index_best = (all_names, all_paths, _build_faiss(embs_best), feats_arr)
+        _embed_index_ckpt = (all_names, all_paths, _build_faiss(embs_ckpt), feats_arr)
+        log(f"Done — {total} images indexed. Ready to compare.")
+
+    except Exception as exc:
+        with _lock:
+            _compare_log.append(f"ERROR: {exc}")
+        raise
+
+
+def start_compare_build():
+    global _compare_thread, _embed_index_best, _embed_index_ckpt
+    if _train_thread and _train_thread.is_alive():
+        return "Stop training first before building the comparison index."
+    if _compare_thread and _compare_thread.is_alive():
+        return "Already building — check the log."
+    _embed_index_best = None
+    _embed_index_ckpt = None
+    with _lock:
+        _compare_log.clear()
+    _compare_thread = threading.Thread(target=_compare_build_worker, daemon=True)
+    _compare_thread.start()
+    return "Building comparison indices (both models, one pass)..."
+
+
+def get_compare_log():
+    with _lock:
+        return "\n".join(_compare_log[-30:])
+
+
+def _load_compare_cache(cache_file):
+    d     = np.load(cache_file, allow_pickle=True)
+    embs  = d['embeddings'].astype(np.float32)
+    feats = d['features'] if 'features' in d else np.zeros((len(d['names']), FEAT_DIM), dtype=np.float32)
+    return d['names'].tolist(), d['paths'].tolist(), _build_faiss(embs), feats
+
+
+def run_compare_search(image):
+    global _embed_index_best, _embed_index_ckpt
+
+    if image is None:
+        return "Upload a photo first.", [], []
+
+    # Lazy-load caches from disk if available
+    if _embed_index_best is None and os.path.exists(EMBED_CACHE_BEST):
+        _embed_index_best = _load_compare_cache(EMBED_CACHE_BEST)
+    if _embed_index_ckpt is None and os.path.exists(EMBED_CACHE_CKPT):
+        _embed_index_ckpt = _load_compare_cache(EMBED_CACHE_CKPT)
+
+    if _embed_index_best is None or _embed_index_ckpt is None:
+        return "Click 'Build Comparison Index' first.", [], []
+
+    if not os.path.exists(APP_BEST) or not os.path.exists(APP_CHECKPOINT):
+        return "Both app_best.pt and app_checkpoint.pt must exist.", [], []
+
+    img_pil  = Image.fromarray(image).convert('RGB')
+    q_feats  = extract_face_features(img_pil)
+    img_t    = test_transform(img_pil).unsqueeze(0).to(DEVICE)
+    feats_t  = torch.tensor(q_feats).unsqueeze(0).to(DEVICE)
+
+    model_best = _load_model_file(APP_BEST)
+    model_ckpt = _load_model_file(APP_CHECKPOINT)
+
+    with torch.no_grad():
+        q_emb_best = model_best.get_embedding(img_t, feats_t).cpu().numpy()[0]
+        q_emb_ckpt = model_ckpt.get_embedding(img_t, feats_t).cpu().numpy()[0]
+
+    gallery_best = _search_with_index(_embed_index_best, q_emb_best, q_feats)
+    gallery_ckpt = _search_with_index(_embed_index_ckpt, q_emb_ckpt, q_feats)
+    return "Done.", gallery_best, gallery_ckpt
+
+
 # ── GRADIO UI ─────────────────────────────────────────────────────────────────
 
 with gr.Blocks(title="Face Verification") as app:
@@ -1113,6 +1336,41 @@ with gr.Blocks(title="Face Verification") as app:
             btn_load.click(load_feedback_pair, outputs=[fb1, fb2, fb_count])
             btn_same.click(label_same,         outputs=[fb1, fb2, fb_count])
             btn_diff.click(label_diff,         outputs=[fb1, fb2, fb_count])
+
+        # ── TAB 5: COMPARE MODELS ─────────────────────────────────────────────
+        with gr.Tab("Compare Models"):
+            gr.Markdown(
+                "Visually compare **Best model (app_best.pt)** vs **Current checkpoint** "
+                "side by side on any photo.  \n"
+                "**Step 1:** Click *Build Comparison Index* once after training finishes "
+                "(embeds all images through both models in one pass, ~2–4 min).  \n"
+                "**Step 2:** Upload a photo and click *Compare*."
+            )
+            with gr.Row():
+                btn_build  = gr.Button("Build Comparison Index", variant="secondary")
+                btn_clog_r = gr.Button("Refresh Log")
+            cmp_status  = gr.Textbox(label="Status", lines=1, interactive=False)
+            cmp_log_box = gr.Textbox(label="Build Log", lines=5, interactive=False)
+
+            gr.Markdown("---")
+            cmp_img = gr.Image(label="Upload Face Photo", type="numpy")
+            btn_cmp = gr.Button("Compare", variant="primary")
+            cmp_result = gr.Textbox(label="", lines=1, interactive=False)
+
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("### Best Model (app_best.pt)")
+                    gallery_best_cmp = gr.Gallery(
+                        label="Best model matches", columns=5, height=300)
+                with gr.Column():
+                    gr.Markdown("### Current Checkpoint")
+                    gallery_ckpt_cmp = gr.Gallery(
+                        label="Checkpoint matches", columns=5, height=300)
+
+            btn_build.click(start_compare_build, outputs=cmp_status)
+            btn_clog_r.click(get_compare_log,   outputs=cmp_log_box)
+            btn_cmp.click(run_compare_search, inputs=cmp_img,
+                          outputs=[cmp_result, gallery_best_cmp, gallery_ckpt_cmp])
 
 
 if __name__ == "__main__":
