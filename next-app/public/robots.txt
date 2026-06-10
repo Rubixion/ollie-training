@@ -1,6 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /api/
-Disallow: /info/
-
-Sitemap: https://ollieai.app/sitemap.xml

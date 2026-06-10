@@ -214,7 +214,7 @@ Returns a scoped subgraph — much faster than reading files one by one.
 | Face Recognition Baseline | `face_recognition.py` — original from-scratch version |
 | Neural Network Layers | `activation_function.py`, `conv_layer.py`, `network.py` — manual backprop |
 
-**Next.js frontend (`next-app/`)**
+**Next.js frontend (`ollie-frontend/`)**
 | Community | What's in it |
 |---|---|
 | AI Explainer Page | `app/ai/page.tsx` — NeuralDeepViz, 8 sections (01–08 incl. blog links) |

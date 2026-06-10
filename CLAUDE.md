@@ -32,9 +32,9 @@ Rules:
 | Siamese Network Architecture | lfw_pytorch.py — ResBlock, SiameseNet, get_embedding |
 | Celebrity Scraper Pipeline | celebrity_scraper.py — scraper, Groq AI verify |
 | Gradio App & Dataset | app.py — all 4 tabs, feedback loop |
-| AI Explainer Page | next-app/app/ai/page.tsx — NeuralDeepViz, sections 01–08 |
-| Blog Post Dynamic Route | next-app/app/blog/[slug]/page.tsx — SEO, CTAs, JSON-LD |
-| API Routes | next-app/app/api/search + feedback routes → Gradio port 7860 |
+| AI Explainer Page | ollie-frontend/app/ai/page.tsx — NeuralDeepViz, sections 01–08 |
+| Blog Post Dynamic Route | ollie-frontend/app/blog/[slug]/page.tsx — SEO, CTAs, JSON-LD |
+| API Routes | ollie-frontend/app/api/search + feedback routes → Gradio port 7860 |
 | WebGL Visual Effects | components/effects/ — Three.js particles, entropy, face-feature-viz |
 | Auth UI & shadcn | components/sign-in, auth-modal, auth-provider, ui/ primitives |
 | Design System | DESIGN.md — color tokens, Geist typography, mesh gradient |
