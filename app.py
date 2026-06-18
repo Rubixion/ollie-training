@@ -673,6 +673,8 @@ def _train_worker(start_fresh=False):
             model.train()
             cosface_head.train()
             tr_correct = tr_total = 0
+            tr_loss_sum = 0.0
+            tr_batches  = 0
             for imgs, targets in train_loader:
                 imgs    = imgs.to(DEVICE, non_blocking=True)
                 targets = targets.long().to(DEVICE, non_blocking=True)
@@ -690,8 +692,10 @@ def _train_worker(start_fresh=False):
                 scaler.step(optimizer)
                 scaler.update()
 
-                tr_correct += (logits.argmax(1) == targets).sum().item()
-                tr_total   += len(targets)
+                tr_correct    += (logits.argmax(1) == targets).sum().item()
+                tr_total      += len(targets)
+                tr_loss_sum   += loss.item()
+                tr_batches    += 1
 
             # ── eval (LFW 10-fold CV) ─────────────────────────────────────────
             model.eval()
@@ -732,7 +736,8 @@ def _train_worker(start_fresh=False):
             }, APP_CHECKPOINT)
 
             lr = optimizer.param_groups[0]['lr']
-            log(f"Epoch {epoch:2d}/34  train {tr_acc*100:.1f}%  "
+            avg_loss = tr_loss_sum / tr_batches if tr_batches else float('nan')
+            log(f"Epoch {epoch:2d}/34  loss {avg_loss:.3f}  train {tr_acc*100:.1f}%  "
                 f"LFW {te_acc*100:.2f}%±{te_std*100:.2f}%  best {best_acc*100:.2f}%  "
                 f"thr {threshold:.3f}  lr={lr:.2e}")
 
