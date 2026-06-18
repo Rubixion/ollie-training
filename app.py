@@ -81,7 +81,12 @@ _embed_index_ckpt = None
 def _get_dataset():
     global _dataset_path
     if _dataset_path is None:
-        _dataset_path = kagglehub.dataset_download("jessicali9530/lfw-dataset")
+        cached = os.path.join(os.path.expanduser("~"), ".cache", "kagglehub",
+                              "datasets", "jessicali9530", "lfw-dataset", "versions", "4")
+        if os.path.isdir(cached):
+            _dataset_path = cached
+        else:
+            _dataset_path = kagglehub.dataset_download("jessicali9530/lfw-dataset")
     return _dataset_path
 
 
@@ -656,8 +661,8 @@ def _train_worker(start_fresh=False):
 
         train_loader = DataLoader(
             MS1MV2Dataset(all_samples, train_transform),
-            batch_size=512, shuffle=True, num_workers=4, pin_memory=True,
-            persistent_workers=True)
+            batch_size=512, shuffle=True, num_workers=6, pin_memory=True,
+            persistent_workers=True, prefetch_factor=4)
 
         for epoch in range(start_epoch, 35):
             if _stop_event.is_set():
