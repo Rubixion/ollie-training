@@ -10,6 +10,7 @@ Tabs:
 
 import os
 import csv
+import time
 import random
 import threading
 import logging
@@ -675,14 +676,17 @@ def _train_worker(start_fresh=False):
             tr_correct = tr_total = 0
             tr_loss_sum = 0.0
             tr_batches  = 0
+            n_batches   = len(train_loader)
+            epoch_start = time.time()
             for imgs, targets in train_loader:
                 imgs    = imgs.to(DEVICE, non_blocking=True)
                 targets = targets.long().to(DEVICE, non_blocking=True)
 
                 with torch.amp.autocast(device_type=DEVICE.type, enabled=use_amp):
-                    embs   = model.get_embedding(imgs)
-                    logits = cosface_head(embs, targets)
-                    loss   = criterion(logits, targets)
+                    embs = model.get_embedding(imgs)
+                # CosFace head in FP32 — s=64 overflows FP16 on 85K classes
+                logits = cosface_head(embs.float(), targets)
+                loss   = criterion(logits, targets)
 
                 optimizer.zero_grad(set_to_none=True)
                 scaler.scale(loss).backward()
@@ -696,6 +700,18 @@ def _train_worker(start_fresh=False):
                 tr_total      += len(targets)
                 tr_loss_sum   += loss.item()
                 tr_batches    += 1
+
+                if tr_batches == 1:
+                    log(f"  first batch loss: {loss.item():.3f}  scaler: {scaler.get_scale():.0f}")
+
+                if tr_batches % 500 == 0 or tr_batches == n_batches:
+                    elapsed   = time.time() - epoch_start
+                    eta_s     = elapsed / tr_batches * (n_batches - tr_batches)
+                    avg_l     = tr_loss_sum / tr_batches
+                    tr_acc_so = tr_correct / tr_total * 100 if tr_total else 0
+                    log(f"  [{tr_batches:5d}/{n_batches}]  "
+                        f"loss {avg_l:.3f}  acc {tr_acc_so:.2f}%  "
+                        f"elapsed {elapsed/60:.1f}m  eta {eta_s/60:.1f}m")
 
             # ── eval (LFW 10-fold CV) ─────────────────────────────────────────
             model.eval()
