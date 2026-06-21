@@ -52,7 +52,7 @@ class MarginCosineProduct(nn.Module):
     s=64 matches InsightFace training configs (sharper softmax, stronger gradients).
     m=0.40 from the original CosFace paper.
     """
-    def __init__(self, in_features, out_features, s=64.0, m=0.40):
+    def __init__(self, in_features, out_features, s=32.0, m=0.35):
         super().__init__()
         self.s = s
         self.m = m
@@ -118,7 +118,8 @@ class MS1MV2Dataset(Dataset):
         try:
             img = self.transform(Image.open(path).convert('RGB'))
         except Exception:
-            img = self.transform(Image.new('RGB', (IMAGE_SIZE, IMAGE_SIZE)))
+            rng = np.random.randint(0, 256, (IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.uint8)
+            img = self.transform(Image.fromarray(rng))
         return img, label
 
 

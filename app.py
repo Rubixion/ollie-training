@@ -662,7 +662,7 @@ def _train_worker(start_fresh=False):
 
         train_loader = DataLoader(
             MS1MV2Dataset(all_samples, train_transform),
-            batch_size=512, shuffle=True, num_workers=6, pin_memory=True,
+            batch_size=512, shuffle=True, num_workers=4, pin_memory=True,
             persistent_workers=True, prefetch_factor=4)
 
         for epoch in range(start_epoch, 35):
@@ -696,13 +696,15 @@ def _train_worker(start_fresh=False):
                 scaler.step(optimizer)
                 scaler.update()
 
-                tr_correct    += (logits.argmax(1) == targets).sum().item()
-                tr_total      += len(targets)
-                tr_loss_sum   += loss.item()
-                tr_batches    += 1
+                tr_batches += 1
+                loss_val = loss.item()
+                if not (loss_val != loss_val or loss_val == float('inf')):  # skip NaN/Inf
+                    tr_correct  += (logits.argmax(1) == targets).sum().item()
+                    tr_total    += len(targets)
+                    tr_loss_sum += loss_val
 
                 if tr_batches == 1:
-                    log(f"  first batch loss: {loss.item():.3f}  scaler: {scaler.get_scale():.0f}")
+                    log(f"  first batch loss: {loss_val:.3f}  scaler: {scaler.get_scale():.0f}")
 
                 if tr_batches % 500 == 0 or tr_batches == n_batches:
                     elapsed   = time.time() - epoch_start
