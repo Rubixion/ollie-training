@@ -662,8 +662,8 @@ def _train_worker(start_fresh=False):
 
         train_loader = DataLoader(
             MS1MV2Dataset(all_samples, train_transform),
-            batch_size=512, shuffle=True, num_workers=4, pin_memory=True,
-            persistent_workers=True, prefetch_factor=4)
+            batch_size=512, shuffle=True, num_workers=2, pin_memory=True,
+            persistent_workers=True, prefetch_factor=2)
 
         for epoch in range(start_epoch, 35):
             if _stop_event.is_set():
