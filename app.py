@@ -608,10 +608,10 @@ def _train_worker(start_fresh=False):
         n_params = sum(p.numel() for p in model.parameters()) / 1e6
         log(f"Model: SphereFaceNet  ({n_params:.1f}M params)")
 
-        # SGD lr=0.1 — matches reference exactly
+        # SGD lr=0.01 — reduced for stability (was 0.1)
         optimizer = optim.SGD(
             [{'params': model.parameters()}, {'params': cosface_head.parameters()}],
-            lr=0.1, momentum=0.9, weight_decay=5e-4)
+            lr=0.01, momentum=0.9, weight_decay=5e-4)
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 20, 25], gamma=0.1)
 
         # AMP — uses FP16 Tensor Cores on CUDA (4060 Ti: 88 TFLOPS vs 22 TFLOPS FP32)
@@ -653,10 +653,13 @@ def _train_worker(start_fresh=False):
                         scaler.load_state_dict(ckpt['scaler'])
                     except Exception:
                         pass
+                # Override learning rate to prevent instability when resuming
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = 0.01  # Reduced from 0.1 for stability
                 start_epoch = ckpt['epoch'] + 1
                 best_acc    = ckpt['best_acc']
                 threshold   = ckpt.get('threshold', 0.5)
-                log(f"Resumed from epoch {ckpt['epoch']}  (best LFW: {best_acc*100:.1f}%)\n")
+                log(f"Resumed from epoch {ckpt['epoch']}  (best LFW: {best_acc*100:.1f}%, LR set to 0.01)\n")
         else:
             log("No checkpoint — starting fresh.\n")
 
