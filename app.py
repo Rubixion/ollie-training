@@ -617,7 +617,7 @@ def _train_worker(start_fresh=False):
         # AMP — uses FP16 Tensor Cores on CUDA (4060 Ti: 88 TFLOPS vs 22 TFLOPS FP32)
         use_amp = DEVICE.type == 'cuda'
         scaler  = torch.amp.GradScaler('cuda', enabled=use_amp)
-        log(f"Optimizer: SGD lr=0.1 momentum=0.9 wd=5e-4  |  MultiStepLR [10,20,25]×0.1"
+        log(f"Optimizer: SGD lr=0.01 momentum=0.9 wd=5e-4  |  MultiStepLR [10,20,25]×0.1"
             f"  |  AMP {'ON' if use_amp else 'OFF'}")
 
         start_epoch = 0
