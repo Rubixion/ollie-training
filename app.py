@@ -653,13 +653,11 @@ def _train_worker(start_fresh=False):
                         scaler.load_state_dict(ckpt['scaler'])
                     except Exception:
                         pass
-                # Override learning rate to prevent instability when resuming
-                for param_group in optimizer.param_groups:
-                    param_group['lr'] = 0.01  # Reduced from 0.1 for stability
                 start_epoch = ckpt['epoch'] + 1
                 best_acc    = ckpt['best_acc']
                 threshold   = ckpt.get('threshold', 0.5)
-                log(f"Resumed from epoch {ckpt['epoch']}  (best LFW: {best_acc*100:.1f}%, LR set to 0.01)\n")
+                resumed_lr  = optimizer.param_groups[0]['lr']
+                log(f"Resumed from epoch {ckpt['epoch']}  (best LFW: {best_acc*100:.1f}%, LR={resumed_lr:.6f})\n")
         else:
             log("No checkpoint — starting fresh.\n")
 
