@@ -95,6 +95,16 @@ def _lfw_root():
     return os.path.join(_get_dataset(), "lfw-deepfunneled", "lfw-deepfunneled")
 
 
+LFW_ALIGN_CACHE = "lfw_aligned_cache"
+
+
+def _lfw_align_cache_path(img_path):
+    """Same md5-of-original-path scheme eval_lfw_aligned.py uses to name cached crops."""
+    import hashlib
+    h = hashlib.md5(img_path.encode('utf-8')).hexdigest()
+    return os.path.join(LFW_ALIGN_CACHE, f"{h}.jpg")
+
+
 def _vgg_root():
     """Return the VGGFace2 train directory, or None if not downloaded yet."""
     if not os.path.exists(VGG_PATH_FILE):
@@ -574,6 +584,29 @@ def _train_worker(start_fresh=False):
             test_people.add(os.path.basename(os.path.dirname(p2)))
         log(f"  Protecting {len(test_people)} LFW identities from training")
 
+        # ── ArcFace-aligned LFW eval ───────────────────────────────────────────
+        # Raw deepfunneled crops (loose, full head/shoulders) are a different
+        # framing than the tight landmark-aligned 112x112 faces the model trains
+        # on, which silently caps verification accuracy regardless of model
+        # quality. lfw_aligned_cache/ (built by eval_lfw_aligned.py) holds each
+        # image re-cropped with InsightFace + norm_crop to match MS1MV2's
+        # alignment protocol — swap to those for eval so the score is real.
+        aligned_pairs, n_missing = [], 0
+        for p1, p2, label in test_pairs:
+            a1, a2 = _lfw_align_cache_path(p1), _lfw_align_cache_path(p2)
+            if os.path.exists(a1) and os.path.exists(a2):
+                aligned_pairs.append((a1, a2, label))
+            else:
+                n_missing += 1
+        if n_missing:
+            log(f"  WARNING: {n_missing}/{len(test_pairs)} pairs missing from "
+                f"lfw_aligned_cache/ — run eval_lfw_aligned.py once to build it. "
+                f"Evaluating on the {len(aligned_pairs)} available aligned pairs.")
+        else:
+            log(f"  Using {len(aligned_pairs)} ArcFace-aligned LFW pairs for eval "
+                f"(lfw_aligned_cache/) instead of misaligned deepfunneled crops")
+        test_pairs = aligned_pairs
+
         # test loader fixed for all epochs — no features needed (pure CNN embeddings)
         test_loader = DataLoader(
             FacePairDataset(test_pairs, test_transform, feature_cache=None),
@@ -602,7 +635,7 @@ def _train_worker(start_fresh=False):
         # ── model + CosFace head ──────────────────────────────────────────────
         global _feat_cache, _embed_index
         model        = SphereFaceNet(EMBEDDING_SIZE).to(DEVICE)
-        cosface_head = MarginCosineProduct(EMBEDDING_SIZE, n_ids).to(DEVICE)
+        cosface_head = MarginCosineProduct(EMBEDDING_SIZE, n_ids, s=64.0, m=0.40).to(DEVICE)
         criterion    = nn.CrossEntropyLoss()
 
         n_params = sum(p.numel() for p in model.parameters()) / 1e6
