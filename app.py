@@ -43,10 +43,12 @@ from celebrity_scraper import (
 
 APP_CHECKPOINT = "app_checkpoint.pt"
 APP_BEST       = "app_best.pt"
+if not os.path.exists(APP_CHECKPOINT) and os.path.exists(APP_BEST):
+    APP_CHECKPOINT = APP_BEST  # ponytail: only app_best.pt was trained; search runs it against itself instead of both slots
 FEEDBACK_CSV   = "feedback_pairs.csv"
 EMBED_CACHE         = "embed_cache.npz"
-EMBED_CACHE_BEST    = "embed_cache_best.npz"
-EMBED_CACHE_CKPT    = "embed_cache_compare.npz"
+EMBED_CACHE_BEST    = "embed_cache_soccer_best.npz"   # new names: old CelebA caches stay untouched
+EMBED_CACHE_CKPT    = "embed_cache_soccer_compare.npz"
 FEAT_CACHE     = "feature_cache.pkl"
 VGG_PATH_FILE    = "vggface2_path.txt"    # persists the kagglehub download location
 MS1MV2_PATH_FILE = "ms1mv2_path.txt"     # path to MS1MV2 112x112 dataset
@@ -1019,10 +1021,11 @@ def _build_embed_index(status_cb=None):
                         all_names.append(_identity)
                         all_paths.append(_fpath)
         else:
-            # No identity file — add all images
+            # No identity file — use filename as name so dedup doesn't collapse
+            # every CelebA image into one bucket (was capping all searches at 2 results)
             for _fname in sorted(os.listdir(celeba_dir)):
                 if _fname.endswith('.jpg'):
-                    all_names.append('celeba')
+                    all_names.append(os.path.splitext(_fname)[0])
                     all_paths.append(os.path.join(celeba_dir, _fname))
 
     total = len(all_paths)
@@ -1394,48 +1397,26 @@ def _load_model_file(path: str):
 
 def _search_with_index(index_tuple, q_emb, q_feats):
     """FAISS search + feature re-ranking. Returns list of (pil_img, caption) tuples."""
-    names, paths, fidx, index_features = index_tuple
+    # ponytail: q_feats unused — feature re-ranking dropped (soccer images have no feature cache yet)
+    names, paths, fidx, _ = index_tuple
     q_emb_f = np.ascontiguousarray(q_emb.reshape(1, -1), dtype=np.float32)
-    D, I    = fidx.search(q_emb_f, 200)
-    top_idx  = I[0]
-    top_dist = np.sqrt(np.maximum(D[0], 0.0))
+    D, I    = fidx.search(q_emb_f, fidx.ntotal)  # every image, so each player's average is complete
+    pct     = np.maximum(0.0, 1.0 - np.sqrt(np.maximum(D[0], 0.0)) / MARGIN) * 100
 
-    q_has_feats = not np.all(q_feats == 0)
-    scored = []
-    for abs_i, embed_dist in zip(top_idx, top_dist):
-        if abs_i < 0:
-            continue
-        penalty = 0.0
-        if q_has_feats:
-            c = index_features[abs_i]
-            if not np.all(c == 0):
-                skin_diff  = abs(float(q_feats[20]) - float(c[20]))
-                hh         = abs(float(q_feats[17]) - float(c[17]))
-                hair_diff  = min(hh, 1.0 - hh)
-                shape_diff = abs(float(q_feats[11]) - float(c[11]))
-                penalty    = 5.0*skin_diff + 2.0*hair_diff + shape_diff
-                if q_feats[28] > 0 and c[28] > 0:
-                    penalty += 3.0 * abs(float(q_feats[28]) - float(c[28]))
-                if q_feats[29] > 0 and c[29] > 0:
-                    penalty += 4.0 * abs(float(q_feats[29]) - float(c[29]))
-            else:
-                penalty = 0.30
-        scored.append((float(embed_dist) + penalty, abs_i, float(embed_dist)))
+    by_player = defaultdict(list)  # name -> [(pct, image index), ...]
+    for i, p in zip(I[0], pct):
+        by_player[names[i]].append((float(p), int(i)))
 
-    scored.sort(key=lambda x: x[0])
-    gallery, seen = [], {}
-    for _, abs_i, embed_dist in scored:
-        display = names[abs_i].replace('_', ' ')
-        seen[display] = seen.get(display, 0) + 1
-        if seen[display] > 2:
-            continue
-        sim_pct = max(0.0, (1.0 - embed_dist / MARGIN)) * 100
-        try:
-            gallery.append((_pil_square(Image.open(paths[abs_i]).convert('RGB'), 160),
-                            f"{display}  ({sim_pct:.0f}%)"))
+    ranked = sorted(by_player.items(), key=lambda kv: -np.mean([p for p, _ in kv[1]]))
+    gallery = []
+    for name, hits in ranked:
+        avg = np.mean([p for p, _ in hits])
+        try:  # face = this player's best-matching image
+            img = _pil_square(Image.open(paths[max(hits)[1]]).convert('RGB'), 160)
         except Exception:
             continue
-        if len(gallery) >= 10:
+        gallery.append((img, f"{name.replace('_', ' ')}  (avg {avg:.0f}%)"))
+        if len(gallery) >= 5:
             break
     return gallery
 
@@ -1459,31 +1440,23 @@ def _compare_build_worker():
         model_ckpt = _load_model_file(APP_CHECKPOINT)
 
         feat_cache = _get_feat_cache()
-        IMG_EXTS   = {'.jpg', '.jpeg', '.png', '.webp'}
         all_names, all_paths = [], []
 
-        root = _lfw_root()
-        if os.path.isdir(root):
-            for person in sorted(os.listdir(root)):
-                folder = os.path.join(root, person)
-                if not os.path.isdir(folder):
-                    continue
-                for fname in sorted(os.listdir(folder)):
-                    if fname.endswith('.jpg'):
-                        all_names.append(person)
-                        all_paths.append(os.path.join(folder, fname))
-
-        if os.path.isdir(SCRAPE_ROOT):
-            for celeb in sorted(os.listdir(SCRAPE_ROOT)):
-                folder = os.path.join(SCRAPE_ROOT, celeb)
-                if not os.path.isdir(folder):
-                    continue
-                for fname in sorted(os.listdir(folder)):
-                    if os.path.splitext(fname)[1].lower() in IMG_EXTS:
-                        all_names.append(celeb)
-                        all_paths.append(os.path.join(folder, fname))
+        # Soccer players only: one folder per player under SCRAPE_ROOT (celebrity_data/)
+        if not os.path.isdir(SCRAPE_ROOT):
+            log(f"ERROR: {SCRAPE_ROOT}/ not found — run build_soccer_dataset.py first."); return
+        for player in sorted(os.listdir(SCRAPE_ROOT)):
+            folder = os.path.join(SCRAPE_ROOT, player)
+            if not os.path.isdir(folder):
+                continue
+            for fname in sorted(os.listdir(folder)):
+                if os.path.splitext(fname)[1].lower() in {'.jpg', '.jpeg', '.png', '.webp'}:
+                    all_names.append(player)
+                    all_paths.append(os.path.join(folder, fname))
 
         total = len(all_paths)
+        if total == 0:
+            log(f"ERROR: no images in {SCRAPE_ROOT}/."); return
         log(f"Embedding {total} images through both models in one pass — ~2-4 min...")
 
         all_embs_best, all_embs_ckpt, all_feats = [], [], []
@@ -1530,12 +1503,31 @@ def _compare_build_worker():
         raise
 
 
-def start_compare_build():
+def _compare_cache_is_fresh():
+    """True if both cache files exist and are newer than the model files they embed."""
+    if not (os.path.exists(EMBED_CACHE_BEST) and os.path.exists(EMBED_CACHE_CKPT)
+            and os.path.exists(APP_BEST) and os.path.exists(APP_CHECKPOINT)):
+        return False
+    return (os.path.getmtime(EMBED_CACHE_BEST) >= os.path.getmtime(APP_BEST)
+            and os.path.getmtime(EMBED_CACHE_CKPT) >= os.path.getmtime(APP_CHECKPOINT))
+
+
+def start_compare_build(force=False):
     global _compare_thread, _embed_index_best, _embed_index_ckpt
     if _train_thread and _train_thread.is_alive():
         return "Stop training first before building the comparison index."
     if _compare_thread and _compare_thread.is_alive():
         return "Already building — check the log."
+
+    if not force and _compare_cache_is_fresh():
+        _embed_index_best = _load_compare_cache(EMBED_CACHE_BEST)
+        _embed_index_ckpt = _load_compare_cache(EMBED_CACHE_CKPT)
+        n = len(_embed_index_best[0])
+        with _lock:
+            _compare_log.clear()
+            _compare_log.append(f"Loaded cached index from disk — {n} images. Ready to compare.")
+        return f"Loaded existing comparison index ({n} images) — models haven't changed since it was built."
+
     _embed_index_best = None
     _embed_index_ckpt = None
     with _lock:
