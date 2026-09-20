@@ -46,7 +46,7 @@ LOG_PATH = "soccer_scrape_progress.log"
 def _log(msg):
     line = f"[{time.strftime('%H:%M:%S')}] {msg}"
     print(line, flush=True)
-    with open(LOG_PATH, "a") as f:
+    with open(LOG_PATH, "a", encoding="utf-8") as f:
         f.write(line + "\n")
 
 
