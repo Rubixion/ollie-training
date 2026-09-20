@@ -297,7 +297,10 @@ def scrape_soccer_players(names=None, n_per_player=8, root=SCRAPE_ROOT, progress
     total = len(names)
     grand = 0
     for i, name in enumerate(names):
-        query = f'{_footballer_query_name(name)} footballer face headshot'
+        query = (
+            f'{_footballer_query_name(name)} footballer face headshot '
+            '-makeup -cosmetics -product -amazon -ebay -shop -logo -jersey'
+        )
         grand += scrape_celebrity(name, n=n_per_player, root=root, query=query)
         if progress_cb:
             progress_cb(name, i + 1, total)
@@ -437,20 +440,43 @@ def ai_verify_all(root=SCRAPE_ROOT, api_key=None, progress_cb=None):
     return kept, removed
 
 
+# Minimum fraction of the image area a detected face bounding box must
+# cover to count as "a real photo of this person" rather than an
+# incidental/spurious face (e.g. a tiny face printed on packaging).
+MIN_FACE_AREA_RATIO = 0.02
+
+
 def clean_non_faces(root=SCRAPE_ROOT, progress_cb=None):
     """
-    Delete downloaded images that don't contain a detectable human face.
-    Uses mediapipe — call this after scrape_all() to remove junk images.
+    Delete downloaded images that don't contain a detectable, reasonably
+    prominent human face. Uses mediapipe — call this after scrape_all()
+    or scrape_soccer_players() to remove junk images (product shots,
+    logos, crowd photos where the person is a speck, etc.).
     Returns (kept, removed).
+
+    IMPORTANT: if mediapipe isn't importable, this is a silent no-op in
+    older versions of this function — that let junk images through
+    undetected. It now raises instead, so a missing/broken mediapipe
+    install can't masquerade as "the filter ran and nothing was junk".
     """
     try:
         from face_features import _get_mesh, _HAVE_MP
         import numpy as np
-    except ImportError:
-        return 0, 0
+    except ImportError as e:
+        raise RuntimeError(
+            "clean_non_faces: face_features could not be imported "
+            f"({e}). Install its dependencies (mediapipe, opencv-python, "
+            "numpy, pillow) — otherwise junk/non-face images will remain "
+            "in the dataset with no warning."
+        ) from e
 
     if not _HAVE_MP:
-        return 0, 0
+        raise RuntimeError(
+            "clean_non_faces: mediapipe is not installed/available, so no "
+            "face filtering can run — run `pip install mediapipe` and "
+            "re-run, otherwise junk images (product photos, logos, etc.) "
+            "will remain in the dataset."
+        )
 
     all_files = []
     for name in sorted(os.listdir(root)):
@@ -468,8 +494,16 @@ def clean_non_faces(root=SCRAPE_ROOT, progress_cb=None):
         has_face = False
         try:
             img_np = np.array(Image.open(path).convert('RGB'))
+            h, w = img_np.shape[:2]
             result = mesh.process(img_np)
-            has_face = bool(result.multi_face_landmarks)
+            if result.multi_face_landmarks:
+                lm = result.multi_face_landmarks[0].landmark
+                xs = [p.x for p in lm]
+                ys = [p.y for p in lm]
+                face_area_ratio = (
+                    (max(xs) - min(xs)) * (max(ys) - min(ys))
+                )  # already normalised 0-1 by mediapipe, no need for h*w
+                has_face = face_area_ratio >= MIN_FACE_AREA_RATIO
         except Exception:
             has_face = False  # corrupt / unreadable — treat as no face → delete
 
