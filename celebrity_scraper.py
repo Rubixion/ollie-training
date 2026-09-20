@@ -7,6 +7,7 @@ Install: pip install duckduckgo-search requests
 
 import os
 import re
+import shutil
 import time
 import itertools
 import random
@@ -308,7 +309,12 @@ def scrape_soccer_players(names=None, n_per_player=8, root=SCRAPE_ROOT, progress
     return grand
 
 
-_GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+# Groq retires models often (llama-4-scout was removed 2026-07); override without editing code:
+#   $env:GROQ_MODEL = "some/other-vision-model"
+_GROQ_MODEL = os.environ.get("GROQ_MODEL", "qwen/qwen3.8-27b")
+# Free tier for this model: ~2K tokens per image vs 8K tokens/min and 200K/day => ~3.5 images/min, ~95/day.
+# Seconds between checks; lower it (or 0) on a paid tier:  $env:GROQ_DELAY = "0.2"
+_GROQ_DELAY = float(os.environ.get("GROQ_DELAY", "17"))
 
 
 def _groq_client(api_key):
@@ -332,7 +338,9 @@ def _image_b64(image_path):
 def verify_with_groq(image_path, celebrity_name, client):
     """
     Ask Groq vision whether the image shows the named celebrity.
-    Returns True (keep) or False (delete). Raises on API errors so caller can log them.
+    Returns True (keep) or False (delete — only on an explicit "no"). Raises on API errors
+    or an unclear reply (e.g. a reasoning model that answers with thinking text) so the
+    caller keeps the image instead of deleting on a bad guess.
     Pass a Groq client instance (not api_key) — create once with _groq_client().
     """
     resp = client.chat.completions.create(
@@ -343,14 +351,23 @@ def verify_with_groq(image_path, celebrity_name, client):
                 {"type": "image_url",
                  "image_url": {"url": _image_b64(image_path)}},
                 {"type": "text",
-                 "text": (f"Is this a real photograph clearly showing the face of "
-                          f"{celebrity_name}? Reply with only 'yes' or 'no'.")},
+                 "text": (f"Is this a clear, real photograph of the soccer player {celebrity_name}? "
+                          "Answer 'yes' only if BOTH are true: (1) it really is him, not a different "
+                          "person; (2) his face is clearly visible and reasonably large in the frame — "
+                          "not blurred, not covered (sunglasses, mask, hands), not a tiny face in a "
+                          "crowd or far-away shot, and not a cartoon, logo, or product picture. "
+                          "Reply with only 'yes' or 'no'.")},
             ],
         }],
         max_tokens=3,
         temperature=0,
     )
-    return resp.choices[0].message.content.strip().lower().startswith('y')
+    answer = (resp.choices[0].message.content or "").strip().lower()
+    if answer.startswith('y'):
+        return True
+    if answer.startswith('n'):
+        return False
+    raise ValueError(f"unclear reply from {_GROQ_MODEL}: {answer[:60]!r}")
 
 
 def groq_identify_face(image_pil, api_key):
@@ -418,24 +435,54 @@ def ai_verify_all(root=SCRAPE_ROOT, api_key=None, progress_cb=None):
             if os.path.splitext(f)[1].lower() in _IMG_EXTS:
                 all_items.append((os.path.join(folder, f), celebrity_name))
 
-    kept = removed = errors = 0
-    for i, (path, celeb) in enumerate(all_items):
-        try:
-            keep = verify_with_groq(path, celeb, client)
-        except Exception:
-            keep  = True   # skip on transient network errors
-            errors += 1
-        if keep:
-            kept += 1
-        else:
+    verified_file = os.path.join(root, ".groq_verified.txt")  # images that already passed, so reruns resume
+    passed = set(open(verified_file, encoding="utf-8").read().splitlines()) if os.path.exists(verified_file) else set()
+    rejected_root = root.rstrip("/\\") + "_rejected"          # "no" images are moved here, not deleted
+    errs = []
+
+    def check(path, celeb):
+        """True = passed, False = rejected, None = couldn't verify (image is kept, retried next run)."""
+        for _ in range(3):
             try:
-                os.remove(path)
+                return verify_with_groq(path, celeb, client)
+            except Exception as e:
+                if getattr(e, "status_code", None) != 429:
+                    errs.append(e)
+                    return None
+                if "per day" in str(e).lower():
+                    raise RuntimeError("Groq daily limit reached — re-run later (or tomorrow); "
+                                       "images that already passed are skipped.") from e
+                time.sleep(30)  # per-minute limit: wait it out and retry this image
+        return None
+
+    kept = removed = errors = checked = 0
+    for i, (path, celeb) in enumerate(all_items):
+        if path in passed:
+            result = True  # checked on an earlier run
+        else:
+            result = check(path, celeb)
+            checked += 1
+            if result is None:
+                errors += 1
+                if errors == checked == 10:  # first 10 all failed: the setup is broken, not the images
+                    raise RuntimeError(f"First 10 Groq checks all failed, nothing was moved. "
+                                       f"Last error: {errs[-1] if errs else 'rate limited'}")
+            elif result:
+                with open(verified_file, "a", encoding="utf-8") as f:
+                    f.write(path + "\n")
+            time.sleep(_GROQ_DELAY)
+        if result is False:
+            try:
+                dest = os.path.join(rejected_root, os.path.basename(os.path.dirname(path)))
+                os.makedirs(dest, exist_ok=True)
+                shutil.move(path, os.path.join(dest, os.path.basename(path)))
                 removed += 1
             except Exception:
                 pass
+        else:
+            kept += 1
         if progress_cb:
             progress_cb(i + 1, len(all_items), kept, removed)
-        time.sleep(0.15)
 
     return kept, removed
 

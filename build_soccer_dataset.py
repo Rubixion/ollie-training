@@ -63,6 +63,9 @@ def main():
                          help="skip Groq AI verification even if GROQ_API_KEY is set")
     parser.add_argument("--skip-scrape", action="store_true",
                          help="only run face-filter/verify on already-downloaded images")
+    parser.add_argument("--skip-filter", action="store_true",
+                         help="skip the face-detector removal step; only Groq AI verification removes images "
+                              "(needs GROQ_API_KEY)")
     args = parser.parse_args()
 
     total = len(SOCCER_PLAYERS)
@@ -80,20 +83,26 @@ def main():
     else:
         _log("--skip-scrape set: skipping download step")
 
-    _log("Filtering out images with no detectable/prominent face...")
+    if args.skip_filter:
+        _log("--skip-filter set: skipping the face-detector removal step")
+        if not os.environ.get("GROQ_API_KEY"):
+            _log("FATAL: --skip-filter with no GROQ_API_KEY means nothing would be checked or removed.")
+            sys.exit(1)
+    else:
+        _log("Filtering out images with no detectable/prominent face...")
 
-    def _face_progress(done, total_, kept, removed):
-        if done % 50 == 0 or done == total_:
-            _log(f"face-filter [{done}/{total_}] kept={kept} removed={removed}")
+        def _face_progress(done, total_, kept, removed):
+            if done % 50 == 0 or done == total_:
+                _log(f"face-filter [{done}/{total_}] kept={kept} removed={removed}")
 
-    try:
-        kept, removed = clean_non_faces(root=args.root, progress_cb=_face_progress)
-    except RuntimeError as e:
-        _log(f"FATAL: {e}")
-        _log("Aborting — fix the dependency issue above and re-run with --skip-scrape "
-             "to just re-filter what's already downloaded.")
-        sys.exit(1)
-    _log(f"Face filter done: kept={kept} removed={removed}")
+        try:
+            kept, removed = clean_non_faces(root=args.root, progress_cb=_face_progress)
+        except RuntimeError as e:
+            _log(f"FATAL: {e}")
+            _log("Aborting — fix the dependency issue above and re-run with --skip-scrape "
+                 "to just re-filter what's already downloaded.")
+            sys.exit(1)
+        _log(f"Face filter done: kept={kept} removed={removed}")
 
     api_key   = os.environ.get("GROQ_API_KEY")
     do_verify = args.verify or (bool(api_key) and not args.no_verify)
@@ -106,12 +115,16 @@ def main():
              "search-engine junk that slips past the face detector)...")
 
         def _verify_progress(done, total_, kept_, removed_):
-            if done % 50 == 0 or done == total_:
-                _log(f"ai-verify [{done}/{total_}] kept={kept_} removed={removed_}")
+            if done % 10 == 0 or done == total_:
+                _log(f"ai-verify [{done}/{total_}] kept={kept_} removed(moved to {args.root}_rejected/)={removed_}")
 
-        v_kept, v_removed = ai_verify_all(
-            root=args.root, api_key=api_key, progress_cb=_verify_progress,
-        )
+        try:
+            v_kept, v_removed = ai_verify_all(
+                root=args.root, api_key=api_key, progress_cb=_verify_progress,
+            )
+        except RuntimeError as e:  # rate limit / broken setup: stop cleanly, the next run resumes
+            _log(f"STOPPED: {e}")
+            sys.exit(1)
         _log(f"AI verify done: kept={v_kept} removed={v_removed}")
     else:
         _log("Skipping AI verification (no GROQ_API_KEY set, or --no-verify passed). "
