@@ -35,7 +35,8 @@ from lfw_pytorch import (
     get_names_from_csv, k_fold_eval,
     scan_ms1mv2, sample_ms1mv2_epoch_pairs, MS1MV2Dataset,
 )
-from face_features import build_feature_cache, extract_face_features, FEAT_DIM, _ZERO_VEC, using_gpu
+from face_features import build_feature_cache, extract_face_features, aligned_face, FEAT_DIM, _ZERO_VEC, using_gpu
+from lookalike import MARGIN, SEARCH_MODES, rank_players
 from celebrity_scraper import (
     scrape_all, get_scraped_pairs, count_images, clean_non_faces,
     ai_verify_all, CELEBRITIES, SCRAPE_ROOT,
@@ -47,13 +48,11 @@ if not os.path.exists(APP_CHECKPOINT) and os.path.exists(APP_BEST):
     APP_CHECKPOINT = APP_BEST  # ponytail: only app_best.pt was trained; search runs it against itself instead of both slots
 FEEDBACK_CSV   = "feedback_pairs.csv"
 EMBED_CACHE         = "embed_cache.npz"
-EMBED_CACHE_BEST    = "embed_cache_soccer_best.npz"   # new names: old CelebA caches stay untouched
-EMBED_CACHE_CKPT    = "embed_cache_soccer_compare.npz"
+EMBED_CACHE_BEST    = "embed_cache_soccer_best.npz"   # new name: old CelebA caches stay untouched
 FEAT_CACHE     = "feature_cache.pkl"
 VGG_PATH_FILE    = "vggface2_path.txt"    # persists the kagglehub download location
 MS1MV2_PATH_FILE = "ms1mv2_path.txt"     # path to MS1MV2 112x112 dataset
 CELEBA_PATH_FILE = "celeba_path.txt"     # path to CelebA aligned faces
-MARGIN         = 2.0
 
 
 # ── contrastive loss ──────────────────────────────────────────────────────────
@@ -78,7 +77,6 @@ _feedback_cur  = {'p1': None, 'p2': None}
 _compare_log: list = []
 _compare_thread = None
 _embed_index_best = None
-_embed_index_ckpt = None
 
 
 def _get_dataset():
@@ -1069,23 +1067,23 @@ def _build_embed_index(status_cb=None):
     return _embed_index
 
 
-def build_feature_index():
+def build_feature_index(rebuild=False):
     """
-    Generator. Runs parallel MediaPipe extraction on every index image that
-    currently has zero features, then updates embed_cache.npz in-place and
-    resets the in-memory index so the next search uses real features.
+    Generator. Runs face-feature extraction on every index image that currently
+    has zero features (rebuild=True: on every image), then updates the cache
+    in-place and resets the in-memory index so the next search uses them.
     """
-    global _embed_index
+    global _embed_index_best
 
-    if not os.path.exists(EMBED_CACHE):
-        yield "No embed cache found — run a search first to build the embedding index."; return
+    if not os.path.exists(EMBED_CACHE_BEST):
+        yield "No index found — click Build Index first."; return
 
-    yield "Loading embed cache..."
-    d     = np.load(EMBED_CACHE, allow_pickle=True)
-    paths = d['paths'].tolist()
-    feats = d['features'].copy() if 'features' in d else np.zeros((len(paths), FEAT_DIM), dtype=np.float32)
+    yield "Loading index..."
+    with np.load(EMBED_CACHE_BEST, allow_pickle=True) as d:
+        paths = d['paths'].tolist()
+        feats = d['features'].copy() if 'features' in d else np.zeros((len(paths), FEAT_DIM), dtype=np.float32)
 
-    missing = [i for i, f in enumerate(feats) if np.all(f == 0)]
+    missing = list(range(len(paths))) if rebuild else [i for i, f in enumerate(feats) if np.all(f == 0)]
     total   = len(missing)
     if total == 0:
         yield f"All {len(paths)} images already have features — nothing to do."; return
@@ -1099,7 +1097,7 @@ def build_feature_index():
             except Exception:
                 pass
             done += 1
-            if done % 500 == 0 or done == total:
+            if done % 100 == 0 or done == total:
                 yield f"  {done}/{total} features extracted  (GPU)..."
     else:
         workers = min(8, (os.cpu_count() or 4))
@@ -1120,19 +1118,21 @@ def build_feature_index():
                 with lock:
                     feats[i2] = feat
                     done += 1
-                    if done % 500 == 0 or done == total:
+                    if done % 100 == 0 or done == total:
                         yield f"  {done}/{total} features extracted  (CPU ×{workers})..."
 
-    yield "Saving updated features to embed cache..."
-    np.savez(EMBED_CACHE,
-             names=d['names'],
-             paths=d['paths'],
-             embeddings=d['embeddings'],
-             features=feats)
+    yield "Saving updated features..."
+    with np.load(EMBED_CACHE_BEST, allow_pickle=True) as c:
+        keep = {k: c[k] for k in ('names', 'paths', 'embeddings')}
+    np.savez(EMBED_CACHE_BEST, features=feats, **keep)
 
-    _embed_index = None  # force reload on next search
+    _embed_index_best = None  # force reload on next search
     nonzero = int(np.any(feats != 0, axis=1).sum())
-    yield f"Done. {nonzero}/{len(paths)} images now have face features. Re-ranking will be much more accurate."
+    yield f"Done. {nonzero}/{len(paths)} images now have face features."
+
+
+def rebuild_feature_index():
+    yield from build_feature_index(rebuild=True)
 
 
 def find_dataset_matches(image, mode="CNN + Features"):
@@ -1395,34 +1395,31 @@ def _load_model_file(path: str):
     return m
 
 
-def _search_with_index(index_tuple, q_emb, q_feats):
-    """FAISS search + feature re-ranking. Returns list of (pil_img, caption) tuples."""
-    # ponytail: q_feats unused — feature re-ranking dropped (soccer images have no feature cache yet)
-    names, paths, fidx, _ = index_tuple
+def _search_with_index(index_tuple, q_emb, q_feats, agg="avg"):
+    """FAISS search + feature re-ranking. Returns the top 5 players as (pil_img, caption) tuples.
+    Scoring lives in lookalike.rank_players (agg: "avg" / "first" / "best")."""
+    names, paths, fidx, index_features = index_tuple
     q_emb_f = np.ascontiguousarray(q_emb.reshape(1, -1), dtype=np.float32)
     D, I    = fidx.search(q_emb_f, fidx.ntotal)  # every image, so each player's average is complete
-    pct     = np.maximum(0.0, 1.0 - np.sqrt(np.maximum(D[0], 0.0)) / MARGIN) * 100
+    dist    = np.empty(fidx.ntotal, dtype=np.float32)
+    dist[I[0]] = np.sqrt(np.maximum(D[0], 0.0))  # back to index order
 
-    by_player = defaultdict(list)  # name -> [(pct, image index), ...]
-    for i, p in zip(I[0], pct):
-        by_player[names[i]].append((float(p), int(i)))
-
-    ranked = sorted(by_player.items(), key=lambda kv: -np.mean([p for p, _ in kv[1]]))
     gallery = []
-    for name, hits in ranked:
-        avg = np.mean([p for p, _ in hits])
+    for name, score, i in rank_players(names, dist, index_features, q_feats, agg):
         try:  # face = this player's best-matching image
-            img = _pil_square(Image.open(paths[max(hits)[1]]).convert('RGB'), 160)
+            img = _pil_square(Image.open(paths[i]).convert('RGB'), 160)
         except Exception:
             continue
-        gallery.append((img, f"{name.replace('_', ' ')}  (avg {avg:.0f}%)"))
+        label = f"avg {score:.0f}%" if agg == "avg" else f"{score:.0f}%"
+        gallery.append((img, f"{name.replace('_', ' ')}  ({label})"))
         if len(gallery) >= 5:
             break
     return gallery
 
 
+
 def _compare_build_worker():
-    global _embed_index_best, _embed_index_ckpt
+    global _embed_index_best
 
     def log(msg):
         with _lock:
@@ -1431,15 +1428,18 @@ def _compare_build_worker():
     try:
         if not os.path.exists(APP_BEST):
             log("ERROR: app_best.pt not found."); return
-        if not os.path.exists(APP_CHECKPOINT):
-            log("ERROR: app_checkpoint.pt not found."); return
 
-        log("Loading Best model (app_best.pt)...")
-        model_best = _load_model_file(APP_BEST)
-        log("Loading Checkpoint model (app_checkpoint.pt)...")
-        model_ckpt = _load_model_file(APP_CHECKPOINT)
+        log("Loading model (app_best.pt)...")
+        model = _load_model_file(APP_BEST)
 
         feat_cache = _get_feat_cache()
+        # carry over already-extracted features so rebuilding the index doesn't throw away Build Feature Index work
+        prev = {}
+        if os.path.exists(EMBED_CACHE_BEST):
+            with np.load(EMBED_CACHE_BEST, allow_pickle=True) as d:
+                if 'features' in d:
+                    prev = {p: f for p, f in zip(d['paths'].tolist(), d['features']) if f.any()}
+
         all_names, all_paths = [], []
 
         # Soccer players only: one folder per player under SCRAPE_ROOT (celebrity_data/)
@@ -1457,45 +1457,38 @@ def _compare_build_worker():
         total = len(all_paths)
         if total == 0:
             log(f"ERROR: no images in {SCRAPE_ROOT}/."); return
-        log(f"Embedding {total} images through both models in one pass — ~2-4 min...")
+        log(f"Detecting + aligning faces and embedding {total} images (slow on CPU)...")
 
-        all_embs_best, all_embs_ckpt, all_feats = [], [], []
+        all_embs, all_feats = [], []
         for i in range(0, total, 64):
             batch_paths = all_paths[i:i+64]
             imgs, batch_feats = [], []
             for p in batch_paths:
                 try:
-                    imgs.append(test_transform(Image.open(p).convert('RGB')))
+                    imgs.append(test_transform(aligned_face(Image.open(p).convert('RGB'))))
                 except Exception:
                     imgs.append(test_transform(Image.new('RGB', (IMAGE_SIZE, IMAGE_SIZE))))
-                batch_feats.append(feat_cache.get(p, _ZERO_VEC))
+                batch_feats.append(prev.get(p, feat_cache.get(p, _ZERO_VEC)))
 
             feat_arr = np.stack(batch_feats).astype(np.float32)
             imgs_t   = torch.stack(imgs).to(DEVICE)
             feats_t  = torch.tensor(feat_arr).to(DEVICE)
             with torch.no_grad():
-                all_embs_best.append(model_best.get_embedding(imgs_t, feats_t).cpu().numpy())
-                all_embs_ckpt.append(model_ckpt.get_embedding(imgs_t, feats_t).cpu().numpy())
+                all_embs.append(model.get_embedding(imgs_t, feats_t).cpu().numpy())
             all_feats.append(feat_arr)
 
             if i % (64 * 20) == 0 and i > 0:
                 log(f"  {min(i + 64, total)}/{total} embedded...")
 
-        embs_best = np.concatenate(all_embs_best, axis=0).astype(np.float32)
-        embs_ckpt = np.concatenate(all_embs_ckpt, axis=0).astype(np.float32)
+        embs      = np.concatenate(all_embs, axis=0).astype(np.float32)
         feats_arr = np.concatenate(all_feats, axis=0)
-        names_arr = np.array(all_names, dtype=object)
-        paths_arr = np.array(all_paths, dtype=object)
 
-        log("Saving caches and building FAISS indices...")
-        np.savez(EMBED_CACHE_BEST, names=names_arr, paths=paths_arr,
-                 embeddings=embs_best, features=feats_arr)
-        np.savez(EMBED_CACHE_CKPT, names=names_arr, paths=paths_arr,
-                 embeddings=embs_ckpt, features=feats_arr)
+        log("Saving cache and building FAISS index...")
+        np.savez(EMBED_CACHE_BEST, names=np.array(all_names, dtype=object),
+                 paths=np.array(all_paths, dtype=object), embeddings=embs, features=feats_arr)
 
-        _embed_index_best = (all_names, all_paths, _build_faiss(embs_best), feats_arr)
-        _embed_index_ckpt = (all_names, all_paths, _build_faiss(embs_ckpt), feats_arr)
-        log(f"Done — {total} images indexed. Ready to compare.")
+        _embed_index_best = (all_names, all_paths, _build_faiss(embs), feats_arr)
+        log(f"Done — {total} images indexed. Ready to search.")
 
     except Exception as exc:
         with _lock:
@@ -1504,37 +1497,37 @@ def _compare_build_worker():
 
 
 def _compare_cache_is_fresh():
-    """True if both cache files exist and are newer than the model files they embed."""
-    if not (os.path.exists(EMBED_CACHE_BEST) and os.path.exists(EMBED_CACHE_CKPT)
-            and os.path.exists(APP_BEST) and os.path.exists(APP_CHECKPOINT)):
-        return False
-    return (os.path.getmtime(EMBED_CACHE_BEST) >= os.path.getmtime(APP_BEST)
-            and os.path.getmtime(EMBED_CACHE_CKPT) >= os.path.getmtime(APP_CHECKPOINT))
+    """True if the cache exists and is newer than the model file it embeds."""
+    return (os.path.exists(EMBED_CACHE_BEST) and os.path.exists(APP_BEST)
+            and os.path.getmtime(EMBED_CACHE_BEST) >= os.path.getmtime(APP_BEST))
 
 
 def start_compare_build(force=False):
-    global _compare_thread, _embed_index_best, _embed_index_ckpt
+    """force=True re-embeds every image from scratch instead of loading the cache."""
+    global _compare_thread, _embed_index_best
     if _train_thread and _train_thread.is_alive():
-        return "Stop training first before building the comparison index."
+        return "Stop training first before building the index."
     if _compare_thread and _compare_thread.is_alive():
         return "Already building — check the log."
 
     if not force and _compare_cache_is_fresh():
         _embed_index_best = _load_compare_cache(EMBED_CACHE_BEST)
-        _embed_index_ckpt = _load_compare_cache(EMBED_CACHE_CKPT)
         n = len(_embed_index_best[0])
         with _lock:
             _compare_log.clear()
-            _compare_log.append(f"Loaded cached index from disk — {n} images. Ready to compare.")
-        return f"Loaded existing comparison index ({n} images) — models haven't changed since it was built."
+            _compare_log.append(f"Loaded cached index from disk — {n} images. Ready to search.")
+        return f"Loaded existing index ({n} images) — the model hasn't changed since it was built."
 
     _embed_index_best = None
-    _embed_index_ckpt = None
     with _lock:
         _compare_log.clear()
     _compare_thread = threading.Thread(target=_compare_build_worker, daemon=True)
     _compare_thread.start()
-    return "Building comparison indices (both models, one pass)..."
+    return "Building index..."
+
+
+def rebuild_compare_index():
+    return start_compare_build(force=True)
 
 
 def get_compare_log():
@@ -1549,216 +1542,87 @@ def _load_compare_cache(cache_file):
     return d['names'].tolist(), d['paths'].tolist(), _build_faiss(embs), feats
 
 
-def run_compare_search(image):
-    global _embed_index_best, _embed_index_ckpt
-
-    if image is None:
-        return "Upload a photo first.", [], []
-
-    # Lazy-load caches from disk if available
-    if _embed_index_best is None and os.path.exists(EMBED_CACHE_BEST):
-        _embed_index_best = _load_compare_cache(EMBED_CACHE_BEST)
-    if _embed_index_ckpt is None and os.path.exists(EMBED_CACHE_CKPT):
-        _embed_index_ckpt = _load_compare_cache(EMBED_CACHE_CKPT)
-
-    if _embed_index_best is None or _embed_index_ckpt is None:
-        return "Click 'Build Comparison Index' first.", [], []
-
-    if not os.path.exists(APP_BEST) or not os.path.exists(APP_CHECKPOINT):
-        return "Both app_best.pt and app_checkpoint.pt must exist.", [], []
-
-    img_pil  = Image.fromarray(image).convert('RGB')
-    q_feats  = extract_face_features(img_pil)
-    img_t    = test_transform(img_pil).unsqueeze(0).to(DEVICE)
-    feats_t  = torch.tensor(q_feats).unsqueeze(0).to(DEVICE)
-
-    model_best = _load_model_file(APP_BEST)
-    model_ckpt = _load_model_file(APP_CHECKPOINT)
-
-    with torch.no_grad():
-        q_emb_best = model_best.get_embedding(img_t, feats_t).cpu().numpy()[0]
-        q_emb_ckpt = model_ckpt.get_embedding(img_t, feats_t).cpu().numpy()[0]
-
-    gallery_best = _search_with_index(_embed_index_best, q_emb_best, q_feats)
-    gallery_ckpt = _search_with_index(_embed_index_ckpt, q_emb_ckpt, q_feats)
-    return "Done.", gallery_best, gallery_ckpt
-
-
-def search_and_compare(image, mode):
+def search_and_compare(image):
     """
-    Generator — extracts face features, then searches the dataset with both
-    app_best.pt and app_checkpoint.pt side by side.
-    Requires the comparison index to be built first (start_compare_build).
+    Generator — searches app_best.pt's index in every SEARCH_MODES mode at once.
+    Yields (log, *one gallery per mode).
     """
+    none = [[]] * len(SEARCH_MODES)
     if image is None:
-        yield "Upload a face photo first.", [], []
+        yield "Upload a face photo first.", *none
         return
-
-    missing = [f for f in [APP_BEST, APP_CHECKPOINT] if not os.path.exists(f)]
-    if missing:
-        yield f"Missing: {', '.join(missing)} — train the model first.", [], []
+    if not os.path.exists(APP_BEST):
+        yield f"Missing {APP_BEST} — train the model first.", *none
         return
 
     img_pil = Image.fromarray(image).convert('RGB')
     q_feats = extract_face_features(img_pil)
-    q_feats_search = _ZERO_VEC.copy() if mode == "CNN Only" else q_feats
 
     diag = "── Feature Analysis ──────────────────────────────────────\n"
     diag += _describe_features(q_feats)
-    yield diag + "\n\nLoading index...", [], []
+    yield diag + "\n\nLoading index...", *none
 
-    global _embed_index_best, _embed_index_ckpt
+    global _embed_index_best
     if _embed_index_best is None and os.path.exists(EMBED_CACHE_BEST):
         _embed_index_best = _load_compare_cache(EMBED_CACHE_BEST)
-    if _embed_index_ckpt is None and os.path.exists(EMBED_CACHE_CKPT):
-        _embed_index_ckpt = _load_compare_cache(EMBED_CACHE_CKPT)
-
-    if _embed_index_best is None or _embed_index_ckpt is None:
-        yield (diag + "\n\nNo index yet — click **Build Index** first.\n"
-               "This embeds all dataset images through both models (~2–4 min)."), [], []
+    if _embed_index_best is None:
+        yield diag + "\n\nNo index yet — click Build Index first.", *none
         return
 
-    img_t   = test_transform(img_pil).unsqueeze(0).to(DEVICE)
+    img_t   = test_transform(aligned_face(img_pil)).unsqueeze(0).to(DEVICE)
     feats_t = torch.tensor(q_feats).unsqueeze(0).to(DEVICE)
-
-    model_best = _load_model_file(APP_BEST)
-    model_ckpt = _load_model_file(APP_CHECKPOINT)
-
     with torch.no_grad():
-        q_emb_best = model_best.get_embedding(img_t, feats_t).cpu().numpy()[0]
-        q_emb_ckpt = model_ckpt.get_embedding(img_t, feats_t).cpu().numpy()[0]
+        q_emb = _load_model_file(APP_BEST).get_embedding(img_t, feats_t).cpu().numpy()[0]
 
-    g_best = _search_with_index(_embed_index_best, q_emb_best, q_feats_search)
-    g_ckpt = _search_with_index(_embed_index_ckpt, q_emb_ckpt, q_feats_search)
-
-    mode_note = {"CNN + Features": "CNN + feature re-ranking",
-                 "CNN Only":       "CNN only"}.get(mode, mode)
-    diag += f"\n\nMode: {mode_note}  |  Best: {len(g_best)} matches  |  Checkpoint: {len(g_ckpt)} matches"
-    yield diag, g_best, g_ckpt
+    galleries = [_search_with_index(_embed_index_best, q_emb,
+                                    q_feats if use_feats else _ZERO_VEC.copy(), one)
+                 for _, use_feats, agg in SEARCH_MODES]
+    yield diag, *galleries
 
 
 # ── GRADIO UI ─────────────────────────────────────────────────────────────────
 
 with gr.Blocks(title="Face Verification") as app:
-    gr.Markdown("# Face Verification — Siamese Network")
+    gr.Markdown("# Soccer Player Lookalike")
+    gr.Markdown(
+        "**Step 1:** *Build Index*, then *Build Feature Index* (once, and again after adding images).  \n"
+        "**Step 2:** Upload a photo and click *Search*. All 6 modes run side by side (model: `app_best.pt`)."
+    )
 
-    with gr.Tabs():
-
-        # ── TAB 1: TRAIN ──────────────────────────────────────────────────────
-        with gr.Tab("Train"):
-            gr.Markdown(
-                "Trains with **contrastive loss** + **geometric face features** "
-                "(inter-eye distance, iris colour & texture, eye aspect ratio).  \n"
-                "Input size: **112×112** (MS1MV2 native). "
-                "Uses LFW + MS1MV2 + VGGFace2 + scraped celebrities + feedback labels.  \n"
-                "With MS1MV2/VGGFace2: switches to **SGD + MultiStepLR** (reference protocol). "
-                "**6,000-pair LFW 10-fold CV** used for validation every epoch (reference protocol)."
-            )
-            chk_fresh = gr.Checkbox(label="Start from scratch (ignore existing checkpoint)",
-                                    value=False)
+    with gr.Row():
+        with gr.Column():
             with gr.Row():
-                btn_start   = gr.Button("Start Training", variant="primary")
-                btn_stop    = gr.Button("Stop Training",  variant="stop")
-                btn_refresh = gr.Button("Refresh Log")
-            status_box = gr.Textbox(label="Status", lines=1, interactive=False)
-            log_box    = gr.Textbox(label="Training Log", lines=22, interactive=False)
-
-            btn_start.click(start_training, inputs=chk_fresh, outputs=status_box)
-            btn_stop.click(stop_training,   outputs=status_box)
-            btn_refresh.click(get_log,      outputs=log_box)
-
-            gr.Markdown("---")
-            gr.Markdown(
-                "**VGGFace2** — 3.3M images across 9,131 celebrities, purpose-built for face recognition.  \n"
-                "Download once, then restart training — pairs are added automatically.  \n"
-                "*(Requires Kaggle API key in `~/.kaggle/kaggle.json`)*"
-            )
-            vgg_status_box = gr.Textbox(label="VGGFace2 Status",
-                                        value=_vgg_status(), lines=1, interactive=False)
-            btn_vgg = gr.Button("Download VGGFace2", variant="secondary")
-            vgg_log = gr.Textbox(label="Download Log", lines=5, interactive=False)
-
-            btn_vgg.click(download_vggface2, inputs=None,
-                          outputs=vgg_log, show_progress="hidden")
-            btn_vgg.click(lambda: _vgg_status(), outputs=vgg_status_box)
-
-            gr.Markdown("---")
-            gr.Markdown(
-                "**MS1MV2 (MS1M-ArcFace)** — 5.8M images across 85,742 identities at 112×112.  \n"
-                "The gold standard for face recognition training (InsightFace dataset).  \n"
-                "When present: switches to **SGD + MultiStepLR** (reference training protocol).  \n"
-                "*(Large download ~35 GB — see button for Kaggle / manual instructions.)*"
-            )
-            ms1mv2_status_box = gr.Textbox(label="MS1MV2 Status",
-                                           value=_ms1mv2_status(), lines=1, interactive=False)
-            btn_ms1mv2 = gr.Button("Download MS1MV2 / Setup Instructions", variant="secondary")
-            ms1mv2_log = gr.Textbox(label="MS1MV2 Log", lines=7, interactive=False)
-
-            btn_ms1mv2.click(download_ms1mv2, inputs=None,
-                             outputs=ms1mv2_log, show_progress="hidden")
-            btn_ms1mv2.click(lambda: _ms1mv2_status(), outputs=ms1mv2_status_box)
-
-        # ── TAB 2: SEARCH ─────────────────────────────────────────────────────
-        with gr.Tab("Search"):
-            gr.Markdown(
-                "Upload a face — searches with **both models** side by side.  \n"
-                "**Step 1:** Click *Build Index* once (~2–4 min) to index all images.  \n"
-                "**Step 2:** Upload a photo and click *Search*."
-            )
-            srch_img  = gr.Image(label="Upload Face", type="numpy")
-            srch_mode = gr.Radio(
-                ["CNN + Features", "CNN Only"],
-                value="CNN + Features", label="Search Mode")
+                btn_bld_idx = gr.Button("Build Index", variant="secondary")
+                btn_rbd_idx = gr.Button("Rebuild Index (from scratch)")
+            bld_log_box = gr.Textbox(label="Index Log", lines=5, interactive=False)
+        with gr.Column():
             with gr.Row():
-                btn_search    = gr.Button("Search",      variant="primary")
-                btn_bld_idx   = gr.Button("Build Index", variant="secondary")
-                btn_bld_log_r = gr.Button("Refresh Log")
-            srch_diag   = gr.Textbox(label="Feature Analysis & Log", lines=14, interactive=False)
-            bld_log_box = gr.Textbox(label="Index Build Log",         lines=4,  interactive=False)
+                btn_feat_s = gr.Button("Build Feature Index", variant="secondary")
+                btn_rbd_feat = gr.Button("Rebuild Feature Index (from scratch)")
+            feat_log_s = gr.Textbox(label="Feature Index Log", lines=5, interactive=False)
 
-            with gr.Row():
+    srch_img = gr.Image(label="Upload Face", type="numpy")
+    btn_search = gr.Button("Search", variant="primary")
+    srch_diag = gr.Textbox(label="Feature Analysis & Log", lines=8, interactive=False)
+
+    galleries = []
+    for r in range(0, len(SEARCH_MODES), 2):  # one row per Features / Only pair
+        with gr.Row():
+            for label, _, _ in SEARCH_MODES[r:r + 2]:
                 with gr.Column():
-                    gr.Markdown("### Best Model  (`app_best.pt`)")
-                    gallery_best_s = gr.Gallery(label="Best model", columns=4, height=380)
-                with gr.Column():
-                    gr.Markdown("### Current Checkpoint  (`app_checkpoint.pt`)")
-                    gallery_ckpt_s = gr.Gallery(label="Checkpoint", columns=4, height=380)
+                    gr.Markdown(f"### {label}")
+                    galleries.append(gr.Gallery(label=label, columns=5, height=260))
 
-            gr.Markdown("---")
-            gr.Markdown(
-                "**Build Feature Index** — runs face detection on every image so "
-                "skin/hair/age re-ranking has real data. Run once after building the search index."
-            )
-            btn_feat_s = gr.Button("Build Feature Index", variant="secondary")
-            feat_log_s = gr.Textbox(label="Feature Index Log", lines=4, interactive=False)
+    btn_search.click(search_and_compare, inputs=srch_img,
+                     outputs=[srch_diag, *galleries], show_progress="hidden")
+    btn_bld_idx.click(start_compare_build, outputs=bld_log_box)
+    btn_rbd_idx.click(rebuild_compare_index, outputs=bld_log_box)
+    btn_feat_s.click(build_feature_index, outputs=feat_log_s, show_progress="hidden")
+    btn_rbd_feat.click(rebuild_feature_index, outputs=feat_log_s, show_progress="hidden")
+    gr.Timer(2).tick(get_compare_log, outputs=bld_log_box, show_progress="hidden")  # auto-refresh index log
 
-            gr.Markdown("---")
-            gr.Markdown(
-                "**CelebA** — 10,177 celebrity identities (202k images). "
-                "Download to add them to the search index."
-            )
-            celeba_status_s = gr.Textbox(label="CelebA Status",
-                                         value=_celeba_status(), lines=1, interactive=False)
-            btn_celeba_s = gr.Button("Download CelebA", variant="secondary")
-            celeba_log_s = gr.Textbox(label="CelebA Log", lines=3, interactive=False)
-
-            btn_search.click(search_and_compare,
-                             inputs=[srch_img, srch_mode],
-                             outputs=[srch_diag, gallery_best_s, gallery_ckpt_s],
-                             show_progress="hidden")
-            btn_bld_idx.click(start_compare_build, outputs=bld_log_box)
-            btn_bld_log_r.click(get_compare_log,   outputs=bld_log_box)
-            btn_feat_s.click(build_feature_index,  outputs=feat_log_s, show_progress="hidden")
-            btn_celeba_s.click(download_celeba,    outputs=celeba_log_s, show_progress="hidden")
-            btn_celeba_s.click(lambda: _celeba_status(), outputs=celeba_status_s)
-
-        # ── SCRAPE DATA tab removed from UI — code kept in celebrity_scraper.py ──
-        # Use celebrity_scraper.py directly via CLI if scraping is needed again.
-        # The scraped images in celebrity_data/ are still picked up by training.
-
-        # ── FEEDBACK tab removed from UI — code kept below ────────────────────
-        # feedback_pairs.csv is still loaded during training automatically.
-        # Call load_feedback_pair / label_same / label_diff directly if needed.
+    # Train tab hidden — training code (start_training etc.) is kept above, just not in the UI.
+    # Scrape / Feedback tabs were already removed; that code is still in celebrity_scraper.py / above.
 
 
 if __name__ == "__main__":

@@ -446,6 +446,39 @@ def ai_verify_all(root=SCRAPE_ROOT, api_key=None, progress_cb=None):
 MIN_FACE_AREA_RATIO = 0.02
 
 
+def _face_ratio_fn():
+    """Return f(rgb_ndarray) -> fraction of the image covered by its largest face.
+    Prefers InsightFace (what the app already uses; mediapipe>=1.0 dropped the
+    legacy mp.solutions API), falls back to legacy mediapipe FaceMesh. Raises if
+    neither works, so a broken install can't look like "no junk found"."""
+    try:
+        from face_features import _get_insight_app, _get_mesh, _HAVE_MP
+    except ImportError as e:
+        raise RuntimeError(f"clean_non_faces: face_features could not be imported ({e}).") from e
+
+    app = _get_insight_app()
+    if app is not None:
+        def ratio(img):
+            h, w = img.shape[:2]
+            return max(((f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]) / (w * h)
+                        for f in app.get(img)), default=0.0)
+        return ratio
+    if _HAVE_MP:
+        mesh = _get_mesh()
+        def ratio(img):
+            r = mesh.process(img)
+            if not r.multi_face_landmarks:
+                return 0.0
+            lm = r.multi_face_landmarks[0].landmark
+            xs, ys = [p.x for p in lm], [p.y for p in lm]
+            return (max(xs) - min(xs)) * (max(ys) - min(ys))  # already normalised 0-1
+        return ratio
+    raise RuntimeError(
+        "clean_non_faces: no face detector available (need insightface, or mediapipe<1.0 "
+        "with mp.solutions) — otherwise junk images (product photos, logos) would remain."
+    )
+
+
 def clean_non_faces(root=SCRAPE_ROOT, progress_cb=None):
     """
     Delete downloaded images that don't contain a detectable, reasonably
@@ -459,24 +492,8 @@ def clean_non_faces(root=SCRAPE_ROOT, progress_cb=None):
     undetected. It now raises instead, so a missing/broken mediapipe
     install can't masquerade as "the filter ran and nothing was junk".
     """
-    try:
-        from face_features import _get_mesh, _HAVE_MP
-        import numpy as np
-    except ImportError as e:
-        raise RuntimeError(
-            "clean_non_faces: face_features could not be imported "
-            f"({e}). Install its dependencies (mediapipe, opencv-python, "
-            "numpy, pillow) — otherwise junk/non-face images will remain "
-            "in the dataset with no warning."
-        ) from e
-
-    if not _HAVE_MP:
-        raise RuntimeError(
-            "clean_non_faces: mediapipe is not installed/available, so no "
-            "face filtering can run — run `pip install mediapipe` and "
-            "re-run, otherwise junk images (product photos, logos, etc.) "
-            "will remain in the dataset."
-        )
+    import numpy as np
+    face_ratio = _face_ratio_fn()
 
     all_files = []
     for name in sorted(os.listdir(root)):
@@ -488,22 +505,11 @@ def clean_non_faces(root=SCRAPE_ROOT, progress_cb=None):
                 all_files.append(os.path.join(folder, f))
 
     kept = removed = 0
-    mesh = _get_mesh()
 
     for i, path in enumerate(all_files):
         has_face = False
         try:
-            img_np = np.array(Image.open(path).convert('RGB'))
-            h, w = img_np.shape[:2]
-            result = mesh.process(img_np)
-            if result.multi_face_landmarks:
-                lm = result.multi_face_landmarks[0].landmark
-                xs = [p.x for p in lm]
-                ys = [p.y for p in lm]
-                face_area_ratio = (
-                    (max(xs) - min(xs)) * (max(ys) - min(ys))
-                )  # already normalised 0-1 by mediapipe, no need for h*w
-                has_face = face_area_ratio >= MIN_FACE_AREA_RATIO
+            has_face = face_ratio(np.array(Image.open(path).convert('RGB'))) >= MIN_FACE_AREA_RATIO
         except Exception:
             has_face = False  # corrupt / unreadable — treat as no face → delete
 

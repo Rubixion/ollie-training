@@ -282,6 +282,25 @@ def using_gpu() -> bool:
     return _HAVE_INSIGHT
 
 
+def aligned_face(img, size=112):
+    """PIL RGB image -> `size`x`size` ArcFace-aligned crop of its largest face (same
+    protocol as eval_lfw_aligned.py / MS1MV2, what the CNN expects). Falls back to the
+    unchanged image when InsightFace is missing or finds no face."""
+    app = _get_insight_app()
+    if app is None:
+        return img
+    try:
+        rgb   = np.array(img.convert('RGB'), dtype=np.uint8)
+        faces = app.get(rgb[:, :, ::-1])  # detector expects BGR, like eval_lfw_aligned.py
+        if faces:
+            from insightface.utils.face_align import norm_crop
+            face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
+            return Image.fromarray(norm_crop(rgb, face.kps, image_size=size))  # warp is channel-agnostic
+    except Exception:
+        pass
+    return img
+
+
 def extract_face_features(img) -> np.ndarray:
     if isinstance(img, Image.Image):
         img_np = np.array(img.convert('RGB'), dtype=np.uint8)
