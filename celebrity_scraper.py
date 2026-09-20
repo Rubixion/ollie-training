@@ -6,6 +6,7 @@ Install: pip install duckduckgo-search requests
 """
 
 import os
+import re
 import time
 import itertools
 import random
@@ -194,9 +195,12 @@ _HEADERS = {
 }
 
 
-def scrape_celebrity(name, n=25, root=SCRAPE_ROOT):
+def scrape_celebrity(name, n=25, root=SCRAPE_ROOT, query=None):
     """
     Download up to n face images for one celebrity via DuckDuckGo image search.
+    `query` overrides the search string while `name` still determines the
+    output folder — lets callers disambiguate search terms (e.g. append
+    "footballer") without splitting same-person images across folders.
     Returns the number of images now stored in the folder.
     """
     try:
@@ -221,7 +225,7 @@ def scrape_celebrity(name, n=25, root=SCRAPE_ROOT):
     try:
         with DDGS() as ddgs:
             results = list(ddgs.images(
-                f'{name} face portrait photo',
+                query or f'{name} face portrait photo',
                 max_results=n * 3,   # fetch extra since some URLs will fail
                 type_image='photo',
             ))
@@ -254,7 +258,7 @@ def scrape_celebrity(name, n=25, root=SCRAPE_ROOT):
     return count_images(outdir)
 
 
-def scrape_all(celebrities=None, n_per_celebrity=25, progress_cb=None):
+def scrape_all(celebrities=None, n_per_celebrity=25, root=SCRAPE_ROOT, progress_cb=None):
     """
     Download images for every celebrity in the list.
     progress_cb(name: str, done: int, total: int) is called after each celebrity.
@@ -265,7 +269,36 @@ def scrape_all(celebrities=None, n_per_celebrity=25, progress_cb=None):
     total = len(celebrities)
     grand = 0
     for i, name in enumerate(celebrities):
-        grand += scrape_celebrity(name, n=n_per_celebrity)
+        grand += scrape_celebrity(name, n=n_per_celebrity, root=root)
+        if progress_cb:
+            progress_cb(name, i + 1, total)
+        time.sleep(1.5)   # avoid DuckDuckGo rate limiting
+    return grand
+
+
+def _footballer_query_name(name):
+    """Strip a trailing disambiguator like ' (Spain)' for the search query
+    while the caller keeps the full string as the folder name, so e.g.
+    'Nico González (Spain)' and 'Nico González (Argentina)' search
+    correctly but never collide into one folder."""
+    return re.sub(r'\s*\([^)]*\)\s*$', '', name).strip()
+
+
+def scrape_soccer_players(names=None, n_per_player=8, root=SCRAPE_ROOT, progress_cb=None):
+    """
+    Download images for every name in a soccer-player list (see
+    soccer_players.SOCCER_PLAYERS). Appends "footballer" to the search
+    query to disambiguate common names from non-footballers.
+    progress_cb(name: str, done: int, total: int) is called after each player.
+    Returns total images stored across all folders.
+    """
+    if names is None:
+        from soccer_players import SOCCER_PLAYERS as names
+    total = len(names)
+    grand = 0
+    for i, name in enumerate(names):
+        query = f'{_footballer_query_name(name)} footballer face headshot'
+        grand += scrape_celebrity(name, n=n_per_player, root=root, query=query)
         if progress_cb:
             progress_cb(name, i + 1, total)
         time.sleep(1.5)   # avoid DuckDuckGo rate limiting
