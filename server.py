@@ -53,12 +53,14 @@ _lock = threading.Lock()
 app   = FastAPI()
 
 
-def _thumb(player):
-    path = os.path.join(HERE, "thumbs", thumb_name(player))
-    if not os.path.exists(path):
-        return None
-    with open(path, "rb") as f:
-        return "data:image/jpeg;base64," + base64.b64encode(f.read()).decode()
+def _thumb(player, idx):
+    """Thumbnail of the exact image that matched (imgthumbs/, made by export_image_thumbs.py),
+    else the player's default one (thumbs/)."""
+    for path in (os.path.join(HERE, "imgthumbs", f"{idx}.jpg"), os.path.join(HERE, "thumbs", thumb_name(player))):
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                return "data:image/jpeg;base64," + base64.b64encode(f.read()).decode()
+    return None
 
 
 @app.get("/health")
@@ -87,10 +89,10 @@ def search(file: UploadFile = File(...), x_api_key: str = Header(default="")):
         modes = {label: rank_players(NAMES, dist, FEATS, q_feats if use_feats else np.zeros_like(q_feats), agg)[:TOP_N]
                  for label, use_feats, agg in MODES}
 
-    shown = {name for rows in modes.values() for name, _, _ in rows}
+    shown = {name: idx for rows in modes.values() for name, _, idx in rows}  # player -> its best-matching image
     return {
         "face_found": bool(np.any(q_feats != 0)),
         "modes": {label: [{"name": n.replace("_", " "), "score": round(s, 1)} for n, s, _ in rows]
                   for label, rows in modes.items()},
-        "thumbs": {n.replace("_", " "): t for n in shown if (t := _thumb(n))},
+        "thumbs": {n.replace("_", " "): t for n, idx in shown.items() if (t := _thumb(n, idx))},
     }
