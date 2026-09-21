@@ -24,15 +24,16 @@ from PIL import Image
 
 from face_features import aligned_face, extract_face_features
 from lfw_pytorch import EMBEDDING_SIZE, SphereFaceNet, test_transform
-from lookalike import SEARCH_MODES, merge_duplicate_names, rank_players, thumb_name
+from lookalike import merge_duplicate_names, rank_players, thumb_name
 
 HERE      = os.path.dirname(os.path.abspath(__file__))
 API_KEY   = os.environ.get("API_KEY")
 MAX_BYTES = 8 * 1024 * 1024  # upload cap
 TOP_N     = 5
-# The site shows one mode: CNN Only, scored by each player's best image.
-# (The Gradio app in app.py still shows every SEARCH_MODES entry.)
-MODES     = [m for m in SEARCH_MODES if m[2] == "best"]
+# The site offers two modes, each scored by a player's best image: the CNN with the skin-tone sanity
+# gate (default; keeps its old label so older frontends still work) and the raw CNN with no gate.
+# (The Gradio app in app.py has its own SEARCH_MODES.)
+MODES     = [("CNN Only (best image)", True, "best"), ("CNN Only (best image, no tweaks)", False, "best")]
 
 if not API_KEY:
     raise SystemExit("Set the API_KEY env var (a Space secret on Hugging Face) — refusing to start an open API.")
