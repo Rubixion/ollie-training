@@ -32,6 +32,9 @@ with np.load(SRC_CACHE, allow_pickle=True) as d:
 np.savez_compressed(f"{OUT}/index.npz", names=np.array(names, dtype=str), embeddings=embs, features=feats)
 
 # one thumbnail per player: the aligned face from their first readable image
+players = set(names)
+print(f"Making thumbnails for {len(players)} players (one face detection each, ~10+ min on CPU). "
+      "Safe to Ctrl+C and re-run: finished ones are skipped.", flush=True)
 have = set()
 for name, path in zip(names, paths):
     if name in have:
@@ -41,10 +44,11 @@ for name, path in zip(names, paths):
         if not os.path.exists(out):
             ImageOps.fit(aligned_face(Image.open(path).convert("RGB")), (THUMB, THUMB)).save(out, quality=85)
         have.add(name)
+        if len(have) % 100 == 0:
+            print(f"  {len(have)}/{len(players)} thumbnails", flush=True)
     except Exception:
         continue  # deleted/unreadable image — the player's next image gets tried
 
-players = set(names)
 print(f"index: {len(names)} images, {len(players)} players | thumbnails: {len(have)}/{len(players)}")
 if players - have:
     print("no thumbnail for:", ", ".join(sorted(players - have)[:10]), "..." if len(players - have) > 10 else "")

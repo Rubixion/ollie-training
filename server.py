@@ -4,7 +4,7 @@ Lookalike API for the Hugging Face Docker Space (or any host).
     API_KEY=secret uvicorn server:app --port 7860
 
 POST /search   multipart field "file" (photo) + header "X-Api-Key"
-  -> {"face_found": bool,
+  -> {"face_found": bool,     # modes: "CNN + Features", "CNN Only", "CNN + Features (best image)", "CNN Only (best image)"
       "modes":  {"<mode label>": [{"name": "Declan Rice", "score": 72.4}, ... top 5]},
       "thumbs": {"Declan Rice": "data:image/jpeg;base64,..."}}     # one thumbnail per player, shared by all modes
 
@@ -30,6 +30,9 @@ HERE      = os.path.dirname(os.path.abspath(__file__))
 API_KEY   = os.environ.get("API_KEY")
 MAX_BYTES = 8 * 1024 * 1024  # upload cap
 TOP_N     = 5
+# The site shows 4 modes: CNN Only / CNN + Features, each averaged over all a player's images or by best image.
+# (The Gradio app in app.py still shows all 6, including the first-image-only ones.)
+MODES     = [m for m in SEARCH_MODES if m[2] != "first"]
 
 if not API_KEY:
     raise SystemExit("Set the API_KEY env var (a Space secret on Hugging Face) — refusing to start an open API.")
@@ -81,7 +84,7 @@ def search(file: UploadFile = File(...), x_api_key: str = Header(default="")):
             q_emb = model.get_embedding(test_transform(aligned_face(img)).unsqueeze(0)).numpy()[0]
         dist = np.linalg.norm(EMBS - q_emb, axis=1)
         modes = {label: rank_players(NAMES, dist, FEATS, q_feats if use_feats else np.zeros_like(q_feats), agg)[:TOP_N]
-                 for label, use_feats, agg in SEARCH_MODES}
+                 for label, use_feats, agg in MODES}
 
     shown = {name for rows in modes.values() for name, _, _ in rows}
     return {

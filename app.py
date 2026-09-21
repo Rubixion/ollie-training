@@ -49,6 +49,7 @@ if not os.path.exists(APP_CHECKPOINT) and os.path.exists(APP_BEST):
 FEEDBACK_CSV   = "feedback_pairs.csv"
 EMBED_CACHE         = "embed_cache.npz"
 EMBED_CACHE_BEST    = "embed_cache_soccer_best.npz"   # new name: old CelebA caches stay untouched
+PARTIAL             = "embed_cache_soccer_best_partial.npz"  # checkpoint of an unfinished Build Index
 FEAT_CACHE     = "feature_cache.pkl"
 VGG_PATH_FILE    = "vggface2_path.txt"    # persists the kagglehub download location
 MS1MV2_PATH_FILE = "ms1mv2_path.txt"     # path to MS1MV2 112x112 dataset
@@ -1067,6 +1068,15 @@ def _build_embed_index(status_cb=None):
     return _embed_index
 
 
+def _save_features(feats):
+    """Write features into the index cache (atomic: a crash mid-write can't corrupt it)."""
+    with np.load(EMBED_CACHE_BEST, allow_pickle=True) as c:
+        keep = {k: c[k] for k in ('names', 'paths', 'embeddings')}
+    tmp = EMBED_CACHE_BEST + ".tmp.npz"
+    np.savez(tmp, features=feats, **keep)
+    os.replace(tmp, EMBED_CACHE_BEST)
+
+
 def build_feature_index(rebuild=False):
     """
     Generator. Runs face-feature extraction on every index image that currently
@@ -1097,7 +1107,10 @@ def build_feature_index(rebuild=False):
             except Exception:
                 pass
             done += 1
-            if done % 100 == 0 or done == total:
+            if done % 500 == 0 and done < total:  # checkpoint: re-clicking Build Feature Index resumes from here
+                _save_features(feats)
+                yield f"  {done}/{total} features extracted  (GPU) — progress saved"
+            elif done % 100 == 0 or done == total:
                 yield f"  {done}/{total} features extracted  (GPU)..."
     else:
         workers = min(8, (os.cpu_count() or 4))
@@ -1118,21 +1131,37 @@ def build_feature_index(rebuild=False):
                 with lock:
                     feats[i2] = feat
                     done += 1
-                    if done % 100 == 0 or done == total:
+                    if done % 500 == 0 and done < total:
+                        _save_features(feats)
+                        yield f"  {done}/{total} features extracted  (CPU ×{workers}) — progress saved"
+                    elif done % 100 == 0 or done == total:
                         yield f"  {done}/{total} features extracted  (CPU ×{workers})..."
 
     yield "Saving updated features..."
-    with np.load(EMBED_CACHE_BEST, allow_pickle=True) as c:
-        keep = {k: c[k] for k in ('names', 'paths', 'embeddings')}
-    np.savez(EMBED_CACHE_BEST, features=feats, **keep)
+    _save_features(feats)
 
     _embed_index_best = None  # force reload on next search
     nonzero = int(np.any(feats != 0, axis=1).sum())
     yield f"Done. {nonzero}/{len(paths)} images now have face features."
 
 
+_feature_log: list = []
+
+
+def _run_feature_index(rebuild):
+    """Runs build_feature_index and keeps its messages, so 'Reload All Logs' can show them again."""
+    _feature_log.clear()
+    for msg in build_feature_index(rebuild=rebuild):
+        _feature_log.append(msg)
+        yield "\n".join(_feature_log[-30:])
+
+
+def start_feature_index():
+    yield from _run_feature_index(False)
+
+
 def rebuild_feature_index():
-    yield from build_feature_index(rebuild=True)
+    yield from _run_feature_index(True)
 
 
 def find_dataset_matches(image, mode="CNN + Features"):
@@ -1418,7 +1447,14 @@ def _search_with_index(index_tuple, q_emb, q_feats, agg="avg"):
 
 
 
-def _compare_build_worker():
+def _save_partial(paths, embs, feats):
+    """Checkpoint of an unfinished index build (atomic: a crash mid-write can't corrupt it)."""
+    tmp = PARTIAL + ".tmp.npz"
+    np.savez(tmp, paths=np.array(paths, dtype=str), embeddings=np.concatenate(embs), features=np.concatenate(feats))
+    os.replace(tmp, PARTIAL)
+
+
+def _compare_build_worker(resume=False):
     global _embed_index_best
 
     def log(msg):
@@ -1459,8 +1495,20 @@ def _compare_build_worker():
             log(f"ERROR: no images in {SCRAPE_ROOT}/."); return
         log(f"Detecting + aligning faces and embedding {total} images (slow on CPU)...")
 
-        all_embs, all_feats = [], []
-        for i in range(0, total, 64):
+        all_embs, all_feats, start = [], [], 0
+        if resume and os.path.exists(PARTIAL):
+            with np.load(PARTIAL) as d:
+                done_paths = d['paths'].tolist()
+                if done_paths == all_paths[:len(done_paths)]:  # same images as when it was saved
+                    all_embs, all_feats, start = [d['embeddings']], [d['features']], len(done_paths)
+                    log(f"Resuming from saved progress: {start}/{total} already done.")
+                else:
+                    log("Saved progress doesn't match the current images — starting over.")
+        elif os.path.exists(PARTIAL):  # from-scratch rebuild: drop any old checkpoint
+            os.remove(PARTIAL)
+
+        t0 = time.time()
+        for i in range(start, total, 64):
             batch_paths = all_paths[i:i+64]
             imgs, batch_feats = [], []
             for p in batch_paths:
@@ -1477,8 +1525,11 @@ def _compare_build_worker():
                 all_embs.append(model.get_embedding(imgs_t, feats_t).cpu().numpy())
             all_feats.append(feat_arr)
 
-            if i % (64 * 20) == 0 and i > 0:
-                log(f"  {min(i + 64, total)}/{total} embedded...")
+            done = min(i + 64, total)
+            if (done - start) % (64 * 10) == 0 and done < total:  # every ~640 images: log + checkpoint
+                _save_partial(all_paths[:done], all_embs, all_feats)
+                eta = (time.time() - t0) / (done - start) * (total - done) / 60
+                log(f"  {done}/{total} embedded — about {eta:.0f} min left (progress saved)")
 
         embs      = np.concatenate(all_embs, axis=0).astype(np.float32)
         feats_arr = np.concatenate(all_feats, axis=0)
@@ -1487,6 +1538,8 @@ def _compare_build_worker():
         np.savez(EMBED_CACHE_BEST, names=np.array(all_names, dtype=object),
                  paths=np.array(all_paths, dtype=object), embeddings=embs, features=feats_arr)
 
+        if os.path.exists(PARTIAL):
+            os.remove(PARTIAL)
         _embed_index_best = (all_names, all_paths, _build_faiss(embs), feats_arr)
         log(f"Done — {total} images indexed. Ready to search.")
 
@@ -1510,7 +1563,8 @@ def start_compare_build(force=False):
     if _compare_thread and _compare_thread.is_alive():
         return "Already building — check the log."
 
-    if not force and _compare_cache_is_fresh():
+    resume = not force and os.path.exists(PARTIAL)  # an unfinished build beats loading the (older) cache
+    if not force and not resume and _compare_cache_is_fresh():
         _embed_index_best = _load_compare_cache(EMBED_CACHE_BEST)
         n = len(_embed_index_best[0])
         with _lock:
@@ -1521,9 +1575,9 @@ def start_compare_build(force=False):
     _embed_index_best = None
     with _lock:
         _compare_log.clear()
-    _compare_thread = threading.Thread(target=_compare_build_worker, daemon=True)
+    _compare_thread = threading.Thread(target=_compare_build_worker, kwargs={"resume": resume}, daemon=True)
     _compare_thread.start()
-    return "Building index..."
+    return "Resuming index build from saved progress..." if resume else "Building index..."
 
 
 def rebuild_compare_index():
@@ -1533,6 +1587,11 @@ def rebuild_compare_index():
 def get_compare_log():
     with _lock:
         return "\n".join(_compare_log[-30:])
+
+
+def reload_all_logs():
+    """(index log, feature index log) — the latest lines of each."""
+    return get_compare_log(), "\n".join(_feature_log[-30:])
 
 
 def _load_compare_cache(cache_file):
@@ -1575,7 +1634,7 @@ def search_and_compare(image):
         q_emb = _load_model_file(APP_BEST).get_embedding(img_t, feats_t).cpu().numpy()[0]
 
     galleries = [_search_with_index(_embed_index_best, q_emb,
-                                    q_feats if use_feats else _ZERO_VEC.copy(), one)
+                                    q_feats if use_feats else _ZERO_VEC.copy(), agg)
                  for _, use_feats, agg in SEARCH_MODES]
     yield diag, *galleries
 
@@ -1584,6 +1643,7 @@ def search_and_compare(image):
 
 with gr.Blocks(title="Face Verification") as app:
     gr.Markdown("# Soccer Player Lookalike")
+    btn_reload = gr.Button("🔄  Reload All Logs", variant="primary", size="lg")
     gr.Markdown(
         "**Step 1:** *Build Index*, then *Build Feature Index* (once, and again after adding images).  \n"
         "**Step 2:** Upload a photo and click *Search*. All 6 modes run side by side (model: `app_best.pt`)."
@@ -1617,7 +1677,8 @@ with gr.Blocks(title="Face Verification") as app:
                      outputs=[srch_diag, *galleries], show_progress="hidden")
     btn_bld_idx.click(start_compare_build, outputs=bld_log_box)
     btn_rbd_idx.click(rebuild_compare_index, outputs=bld_log_box)
-    btn_feat_s.click(build_feature_index, outputs=feat_log_s, show_progress="hidden")
+    btn_reload.click(reload_all_logs, outputs=[bld_log_box, feat_log_s], show_progress="hidden")
+    btn_feat_s.click(start_feature_index, outputs=feat_log_s, show_progress="hidden")
     btn_rbd_feat.click(rebuild_feature_index, outputs=feat_log_s, show_progress="hidden")
     gr.Timer(2).tick(get_compare_log, outputs=bld_log_box, show_progress="hidden")  # auto-refresh index log
 

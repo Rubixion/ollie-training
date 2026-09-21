@@ -18,5 +18,6 @@ COPY --chown=user . .
 # Bake the InsightFace detector (~280 MB download) into the image so cold starts don't fetch it
 RUN python -c "from face_features import _get_insight_app; _get_insight_app()"
 
+# Hosts pick the port via $PORT (Cloud Run: 8080, Railway, Fly); Hugging Face expects 7860
 EXPOSE 7860
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT:-7860}"]
