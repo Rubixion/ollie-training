@@ -4,7 +4,7 @@ Lookalike API for the Hugging Face Docker Space (or any host).
     API_KEY=secret uvicorn server:app --port 7860
 
 POST /search   multipart field "file" (photo) + header "X-Api-Key"
-  -> {"face_found": bool,     # modes: "CNN + Features", "CNN Only", "CNN + Features (best image)", "CNN Only (best image)"
+  -> {"face_found": bool,     # modes: "CNN Only (best image)"
       "modes":  {"<mode label>": [{"name": "Declan Rice", "score": 72.4}, ... top 5]},
       "thumbs": {"Declan Rice": "data:image/jpeg;base64,..."}}     # one thumbnail per player, shared by all modes
 
@@ -24,15 +24,15 @@ from PIL import Image
 
 from face_features import aligned_face, extract_face_features
 from lfw_pytorch import EMBEDDING_SIZE, SphereFaceNet, test_transform
-from lookalike import SEARCH_MODES, rank_players, thumb_name
+from lookalike import SEARCH_MODES, merge_duplicate_names, rank_players, thumb_name
 
 HERE      = os.path.dirname(os.path.abspath(__file__))
 API_KEY   = os.environ.get("API_KEY")
 MAX_BYTES = 8 * 1024 * 1024  # upload cap
 TOP_N     = 5
-# The site shows 4 modes: CNN Only / CNN + Features, each averaged over all a player's images or by best image.
-# (The Gradio app in app.py still shows all 6, including the first-image-only ones.)
-MODES     = [m for m in SEARCH_MODES if m[2] != "first"]
+# The site shows one mode: CNN Only, scored by each player's best image.
+# (The Gradio app in app.py still shows every SEARCH_MODES entry.)
+MODES     = [m for m in SEARCH_MODES if m[2] == "best"]
 
 if not API_KEY:
     raise SystemExit("Set the API_KEY env var (a Space secret on Hugging Face) — refusing to start an open API.")
@@ -44,7 +44,7 @@ model.load_state_dict(raw["model"] if isinstance(raw, dict) and "model" in raw e
 model.eval()
 
 with np.load(os.path.join(HERE, "index.npz")) as d:
-    NAMES, EMBS, FEATS = d["names"].tolist(), d["embeddings"].astype(np.float32), d["features"].astype(np.float32)
+    NAMES, EMBS, FEATS = merge_duplicate_names(d["names"].tolist()), d["embeddings"].astype(np.float32), d["features"].astype(np.float32)
 
 # ponytail: one search at a time (CPU-bound anyway, and the InsightFace session isn't shared-safe);
 # run more than one worker/replica if this ever queues up.
