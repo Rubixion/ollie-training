@@ -1,4 +1,20 @@
 data/
+data_pilot2/
 cache/
 models/
+sheets/*.jpg
+
+# Local Python and environment files
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Generated reports and local OS files
+audit_report.json
+.DS_Store
+Thumbs.db
+
 *.log

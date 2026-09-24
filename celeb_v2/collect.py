@@ -54,25 +54,32 @@ UA = "OllieCelebIndex/2.0 (https://ollie.ml)"
 API = "https://commons.wikimedia.org/w/api.php"
 
 TARGET = 5000          # people with >= MIN_KEEP verified photos
-MIN_KEEP, MAX_KEEP = 5, 15
+MIN_KEEP, MAX_KEEP = 3, 12  # 3 verified photos is enough to match on; fewer licensed photos exist for the less famous
 THUMB_W = 960          # a Wikimedia standard thumbnail width
 MAX_TRUSTED, MAX_SEARCH = 80, 40   # candidates per person: own photo/depicts/category, name search
 MAX_DOWNLOADS = 60     # per person; downloads are the bottleneck (robot policy: 2 at a time)
 
 FACE_MIN_W = 80        # px, in the 960px thumbnail
-DET_MIN = 0.75
-SECOND_FACE_MAX = 0.40  # a second face bigger than this (area ratio) = group photo
-YAW_MAX = 0.40          # nose offset from the eye midline, in eye-distances (0 = frontal)
+DET_MIN = 0.70
+SECOND_FACE_MAX = 0.65  # a second face bigger than this (area ratio) = group photo; the verified face box is stored
+YAW_MAX = 0.55          # nose offset from the eye midline, in eye-distances (0 = frontal; 3/4 views ok)
 CHROMA_MIN = 3.0        # mean colour in the inner face; true B&W is ~0
 INDEP_MIN = 3.5         # colour not explained by brightness; B&W, sepia and tints are < 3
 BLUR_MIN = 40.0         # Laplacian variance of the aligned 112px face
 AGE_MIN = 14            # estimated age; rejects childhood photos
 SIM_TRUSTED, SIM_SEARCH = 0.45, 0.50   # ArcFace cosine to the person's centroid
 SIM_ANCHOR_MIN = 0.25   # and never far from their own Wikidata photo
-DUP_SIM = 0.92          # same photo (crop/resize) or near-identical burst shot
+DUP_SIM = 0.85          # same photo (crop/resize) or a near-identical frame from the same moment (pilot: 0.87-0.88)
+PER_DAY = 3             # at most this many photos taken on the same day (one event = one look)
+CLIP_FAKE_MAX = 0.72    # CLIP: probability of bust/wax/mannequin/poster/screen/render/drawing/meme (real photos <0.70)
+# Dark sunglasses: CLIP sure on its own, or fairly sure while the eyes are also much darker than the cheeks.
+# Neither works alone: CLIP mixes up clear and tinted glasses, and deep-set eyes in shade read dark too.
+SUNGLASSES_SURE, SUNGLASSES_MAYBE, EYE_DARK = 0.85, 0.62, 0.50
 
-# cc-by / cc-by-sa any version (+ jurisdiction/"migrated" suffix), cc0, public domain. NC/ND never match.
-LICENSE_RE = re.compile(r"cc0|pd|pd-[a-z0-9-]+|cc-by(-sa)?-\d(\.\d)?(-[a-z]+)*")
+# cc-by / cc-by-sa any version (+ jurisdiction/"migrated" suffix), cc0, public domain, and two attribution-only
+# licenses (Korea's KOGL type 1, Commons' {{Attribution}}). NC/ND never match. Not UK OGL or India's GODL:
+# both carve personal data out of the grant, and a photo of a recognisable person is personal data.
+LICENSE_RE = re.compile(r"cc0|pd|pd-[a-z0-9-]+|cc-by(-sa)?-\d(\.\d)?(-[a-z]+)*|kogl type 1|attribution")
 BAD_TEMPLATES = ["Template:Deletion template tag", "Template:Delete", "Template:Copyvio",
                  "Template:Speedydelete", "Template:No permission since", "Template:No license since",
                  "Template:No source since"]
@@ -84,7 +91,8 @@ NON_PHOTO = re.compile(r"\b(" + "|".join([
     r"look-?alikes?", r"fan ?art", r"ai[- ]generated", r"generated (by|with) ai", r"midjourney",
     r"stable diffusion", r"dall-?e", r"stamps?", r"banknotes?", r"coins?", r"masks?", r"signatures?", r"logos?",
     r"(album|book|magazine) covers?", r"cover art", r"renders?", r"rendering", r"3d models?", r"holograms?",
-    r"puppets?", r"emojis?", r"oil on canvas", r"mannequins?", r"cardboard", r"cut-?outs?",
+    r"puppets?", r"emojis?", r"oil on canvas", r"mannequins?", r"cardboard", r"cut-?outs?", r"memes?",
+    r"collages?",
 ]) + r")\b")
 # Subcategories that aren't portraits of the person (award shows, festivals, parliament etc. stay in).
 SUBCAT_SKIP = re.compile(r"\b(" + "|".join([
@@ -101,7 +109,7 @@ BUSY = re.compile(r"\b(concert|performing|performance|live|tour|stage|match|game
                   r"cast|team|squad|family|fans|panel|group|band|and|with|meets|meeting|visit|ceremony|parade)\b")
 
 EXTMETA = ("License|LicenseShortName|LicenseUrl|Artist|Credit|ImageDescription|ObjectName|"
-           "AttributionRequired|Restrictions")
+           "AttributionRequired|Restrictions|DateTimeOriginal")
 
 
 # ── polite HTTP ────────────────────────────────────────────────────────────────
@@ -185,8 +193,9 @@ def file_info(pages, source):
         lic = str(meta.get("License", "")).lower().strip()
         short = plain(str(meta.get("LicenseShortName", "")))
         text = f"{p['title']} {plain(str(meta.get('ImageDescription', '')))} {plain(str(meta.get('ObjectName', '')))}".lower()
-        licensed = bool(LICENSE_RE.fullmatch(lic)) or short.lower() in ("public domain", "cc0")
-        if info.get("mime") not in ("image/jpeg", "image/png", "image/webp"):
+        # machine id, or only the template's short name when Commons has no id for it (e.g. "KOGL Type 1")
+        licensed = any(LICENSE_RE.fullmatch(x) for x in (lic, short.lower())) or short.lower() in ("public domain", "cc0")
+        if info.get("mime") not in ("image/jpeg", "image/png", "image/webp", "image/tiff"):  # tiff: served as jpeg thumbs
             dropped["not_a_photo_file"] += 1
         elif min(info.get("width", 0), info.get("height", 0)) < 300:
             dropped["too_small"] += 1
@@ -195,7 +204,7 @@ def file_info(pages, source):
         elif NON_PHOTO.search(text):
             dropped["not_a_photo_by_title"] += 1
         elif not licensed and source != "wikidata_photo":
-            dropped["license"] += 1
+            dropped[f"license:{lic or short.lower()}"] += 1
         else:
             author = plain(str(meta.get("Artist", ""))) or plain(str(meta.get("Credit", ""))) or "Unknown author"
             out.append({
@@ -206,6 +215,7 @@ def file_info(pages, source):
                 "author": author[:200], "license": short or lic, "license_url": str(meta.get("LicenseUrl", "")),
                 "attribution_required": str(meta.get("AttributionRequired", "true")).lower() != "false",
                 "restrictions": plain(str(meta.get("Restrictions", ""))),
+                "date": (re.findall(r"\d{4}-\d{2}-\d{2}", str(meta.get("DateTimeOriginal", ""))) or [""])[0],
             })
     return out, dropped
 
@@ -232,28 +242,44 @@ def gather(celeb):
 
     if celeb["images"]:
         add(pages_of(api(titles="|".join("File:" + f for f in celeb["images"][:5]), **INFO)), "wikidata_photo", 5)
+    # Every source, then rank the whole pool (a source full of concert shots mustn't crowd out portraits).
+    # Files whose structured data says they depict this exact Wikidata person:
+    add(pages_of(api(generator="search", gsrsearch=f"haswbstatement:P180={celeb['qid']} filetype:bitmap",
+                     gsrnamespace=6, gsrlimit=50, **INFO)), "depicts", 50)
     name_words = [w.lower() for w in re.findall(r"\w+", celeb["name"]) if len(w) > 2]
     for cat in celeb["commons_categories"][:2]:
         add(pages_of(api(generator="categorymembers", gcmtitle=f"Category:{cat}", gcmtype="file",
-                         gcmlimit=50, **INFO)), "category", MAX_TRUSTED)
-        if len(cands) >= 40:
-            continue
+                         gcmlimit=50, **INFO)), "category", 50)
         subcats = [m["title"] for m in api(list="categorymembers", cmtitle=f"Category:{cat}", cmtype="subcat",
                                            cmlimit=100).get("query", {}).get("categorymembers", [])]
         subcats = [s for s in subcats if all(w in s.lower() for w in name_words[-1:])
                    and not SUBCAT_SKIP.search(s.lower())]
-        subcats.sort(key=lambda s: max(re.findall(r"(?:19|20)\d\d", s) or ["0"]), reverse=True)  # recent first
-        for sub in subcats[:6]:
-            if len(cands) >= MAX_TRUSTED:
-                break
+        # portrait-friendly events first (premieres, awards, festivals...), stage/sport action last, recent first
+        subcats.sort(key=lambda s: (not BUSY.search(s.lower()), max(re.findall(r"(?:19|20)\d\d", s) or ["0"])),
+                     reverse=True)
+        for sub in subcats[:5]:
             add(pages_of(api(generator="categorymembers", gcmtitle=sub, gcmtype="file", gcmlimit=12, **INFO)),
-                "subcategory", MAX_TRUSTED - len(cands))
-    if len(cands) < 40:
-        add(pages_of(api(generator="search", gsrsearch=f'"{celeb["name"]}" filetype:bitmap', gsrnamespace=6,
-                         gsrlimit=50, **INFO)), "search", MAX_SEARCH)
-    order = {"wikidata_photo": 0, "category": 1, "subcategory": 2, "search": 3}
-    cands.sort(key=lambda c: order[c["source"]])
-    return cands, dropped
+                "subcategory", 12)
+    add(pages_of(api(generator="search", gsrsearch=f'"{celeb["name"]}" filetype:bitmap', gsrnamespace=6,
+                     gsrlimit=50, **INFO)), "search", MAX_SEARCH)
+    for native in celeb.get("native_names", [])[:2]:  # e.g. 김제니, Владимир Путин: titles are often in that script
+        add(pages_of(api(generator="search", gsrsearch=f'"{native}" filetype:bitmap', gsrnamespace=6,
+                         gsrlimit=30, **INFO)), "search", 30)
+    cands.sort(key=prior, reverse=True)
+    trusted = [c for c in cands if c["source"] != "search"][:MAX_TRUSTED]
+    return sorted(trusted + [c for c in cands if c["source"] == "search"], key=prior, reverse=True), dropped
+
+
+def prior(c):
+    """How likely a candidate is to be a usable single-person portrait, from metadata alone."""
+    title = c["title"].lower()
+    s = 10 if c["source"] == "wikidata_photo" else 0      # always first: it anchors identity
+    s += 3 if "cropped" in title else 0                   # editors' face crops for infoboxes
+    ratio = c["height"] / max(c["width"], 1)
+    s += 1 if ratio >= 1.1 else (-1 if ratio < 0.7 else 0)
+    s -= 2 if BUSY.search(title) else 0
+    s -= 1 if c["source"] == "search" else 0
+    return s
 
 
 # ── photo checks (InsightFace) ─────────────────────────────────────────────────
@@ -309,7 +335,8 @@ def analyze(data):
     second = area(faces[1][0]) / area(box) if len(faces) > 1 else 0.0
     d = {"emb": face.normed_embedding.astype(np.float32), "det_score": round(float(box[4]), 3),
          "face_width": round(fw), "age_estimate": int(face.age), "second_face": round(second, 2),
-         "image": im, "anchor_ok": box[4] >= 0.6 and fw >= 50 and second <= SECOND_FACE_MAX}
+         "image": im, "box": [float(v) for v in box[:4]],
+         "anchor_ok": box[4] >= 0.6 and fw >= 50 and second <= SECOND_FACE_MAX}
 
     inside = (min(x2, w) - max(x1, 0)) * (min(y2, h) - max(y1, 0)) / max(fw * fh, 1)
     le, re_, nose = kps[0], kps[1], kps[2]
@@ -324,6 +351,13 @@ def analyze(data):
     aligned = norm_crop(bgr, kps, image_size=112)
     d["sharpness"] = round(float(cv2.Laplacian(cv2.cvtColor(aligned, cv2.COLOR_BGR2GRAY), cv2.CV_64F).var()), 1)
     d["yaw"] = round(yaw, 2)
+    # sunglasses: eye regions (fixed spots in the aligned face) much darker than the cheeks, and flat
+    L = cv2.cvtColor(aligned, cv2.COLOR_BGR2LAB)[..., 0].astype(np.float32)
+    eyes = np.concatenate([L[45:59, 30:47].ravel(), L[45:59, 65:82].ravel()])
+    cheeks = np.concatenate([L[66:80, 28:44].ravel(), L[66:80, 68:84].ravel()])
+    eye_ratio = float(eyes.mean() / max(cheeks.mean(), 1.0))
+    d["eye_ratio"] = round(eye_ratio, 2)
+    sunglasses = eye_ratio < 0.22 or (eye_ratio < 0.32 and eyes.std() < 30)
 
     if box[4] < DET_MIN:
         return "unclear_face", d
@@ -333,18 +367,132 @@ def analyze(data):
         return "group_photo", d
     if inside < 0.9:
         return "face_cut_off", d
-    if yaw > YAW_MAX or eye_d / max(fw, 1) < 0.25:
+    if yaw > YAW_MAX or eye_d / max(fw, 1) < 0.22:
         return "not_frontal", d
     if chroma < CHROMA_MIN or indep < INDEP_MIN:
         return "black_and_white", d
     if d["sharpness"] < BLUR_MIN:
         return "blurry", d
+    if sunglasses:
+        return "sunglasses", d
     if face.age < AGE_MIN:
         return "child", d
     return None, d
 
 
+# ── is it a real photo? (CLIP) ─────────────────────────────────────────────────
+# Catches what face checks can't: a bronze bust or wax figure has a face, and a poster, screen or
+# display case holds a real face, all of which can match the person's identity.
+
+CLIP_DIR = os.path.join(HERE, "models", "clip-vit-base-patch16")   # fp32: fp16 is 4x slower on DirectML
+# Glamour/red-carpet/sport prompts on the real side, or heavy make-up reads as "wax figure".
+REAL = ["a photo of a person", "a photo of a man", "a photo of a woman", "a close-up photo of a person's face",
+        "a candid photo of a celebrity at an event", "a glamorous photo of a celebrity wearing makeup",
+        "a red carpet photo of a celebrity", "a press photo of a smiling person",
+        "a photo of an athlete during a game", "a photo of a person speaking into a microphone"]
+FAKE = ["a photo of a bronze bust", "a photo of a marble statue", "a photo of a wax figure", "a photo of a mannequin",
+        "a painting of a person", "a drawing of a person", "a cartoon", "a 3D render of a person",
+        "a video game character", "a photo of a poster on a wall", "a photo of a TV screen",
+        "a photo of a magazine cover", "a photo of a doll", "a black and white photo",
+        "a meme with text", "a collage of several photos", "a screenshot of a social media post"]
+GLASSES = ["a photo of a person wearing dark sunglasses", "a photo of a person with clearly visible eyes",
+           "a photo of a person wearing clear eyeglasses"]  # first = sunglasses; the others compete for it
+CLIP_MEAN = np.array([0.48145466, 0.4578275, 0.40821073], np.float32)
+CLIP_STD = np.array([0.26862954, 0.26130258, 0.27577711], np.float32)
+_clip = None
+
+
+def clip_model():
+    """-> (vision session, input name, input dtype, prompt embeddings). Prompt embeddings are cached."""
+    global _clip
+    if _clip is None:
+        import onnxruntime as ort
+        vis = ort.InferenceSession(os.path.join(CLIP_DIR, "onnx", "vision_model.onnx"),
+                                   providers=["DmlExecutionProvider", "CPUExecutionProvider"])
+        prompts = REAL + FAKE + GLASSES
+        cache = os.path.join(CLIP_DIR, "prompts.npz")
+        T = None
+        if os.path.exists(cache):
+            z = np.load(cache)
+            T = z["emb"] if list(z["prompts"]) == prompts else None
+        if T is None:
+            from tokenizers import Tokenizer
+            so = ort.SessionOptions()
+            so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL  # fp16 layer-norm fusion bug
+            txt = ort.InferenceSession(os.path.join(CLIP_DIR, "onnx", "text_model.onnx"), so,
+                                       providers=["CPUExecutionProvider"])
+            tok = Tokenizer.from_file(os.path.join(CLIP_DIR, "tokenizer.json"))
+            ids = np.full((len(prompts), 77), 49407, np.int64)  # pad with <|endoftext|>
+            mask = np.zeros_like(ids)
+            for i, p in enumerate(prompts):
+                e = tok.encode(p).ids[:77]
+                ids[i, :len(e)], mask[i, :len(e)] = e, 1
+            feeds = {"input_ids": ids}
+            if any(x.name == "attention_mask" for x in txt.get_inputs()):
+                feeds["attention_mask"] = mask
+            names = [o.name for o in txt.get_outputs()]
+            T = txt.run(["text_embeds"] if "text_embeds" in names else None, feeds)[0].astype(np.float32)
+            T /= np.linalg.norm(T, axis=1, keepdims=True)
+            np.savez(cache, prompts=np.array(prompts), emb=T)
+        inp = vis.get_inputs()[0]
+        _clip = (vis, inp.name, np.float16 if "float16" in inp.type else np.float32, T.astype(np.float32))
+    return _clip
+
+
+def clip_pixels(im):
+    w, h = im.size
+    s = 224 / min(w, h)
+    im = im.resize((max(224, round(w * s)), max(224, round(h * s))), Image.BICUBIC)
+    w, h = im.size
+    l, t = (w - 224) // 2, (h - 224) // 2
+    x = (np.asarray(im.crop((l, t, l + 224, t + 224)), np.float32) / 255 - CLIP_MEAN) / CLIP_STD
+    return x.transpose(2, 0, 1)
+
+
+def square(im, cx, cy, side):
+    side = min(side, im.width, im.height)
+    l = int(min(max(cx - side / 2, 0), im.width - side))
+    t = int(min(max(cy - side / 2, 0), im.height - side))
+    return im.crop((l, t, l + int(side), t + int(side)))
+
+
+def photo_scores(items):
+    """For each accepted photo -> (probability it is not a real photo + the likeliest fake kind,
+    probability of sunglasses). Two views each: the face with context, and a tight face crop."""
+    if not items:
+        return []
+    vis, name, dtype, T = clip_model()
+    views = []
+    for a in items:
+        x1, y1, x2, y2 = a["box"]
+        cx, cy, side = (x1 + x2) / 2, (y1 + y2) / 2, max(x2 - x1, y2 - y1)
+        views += [clip_pixels(square(a["image"], cx, cy, side * 3.5)), clip_pixels(square(a["image"], cx, cy, side * 1.5))]
+    E = np.concatenate([vis.run(["image_embeds"], {name: np.stack(views[i:i + 8]).astype(dtype)})[0]
+                        for i in range(0, len(views), 8)]).astype(np.float32)
+    E /= np.linalg.norm(E, axis=1, keepdims=True)
+    logits = 100 * E @ T.T
+    nr, nf = len(REAL), len(FAKE)
+
+    def softmax(z):
+        z = np.exp(z - z.max(1, keepdims=True))
+        return z / z.sum(1, keepdims=True)
+
+    p = softmax(logits[:, :nr + nf])
+    g = softmax(logits[:, nr + nf:])
+    out = []
+    for i in range(len(items)):
+        ctx, face = p[2 * i], p[2 * i + 1]
+        fake = max(ctx[nr:].sum(), face[nr:].sum())
+        kind = FAKE[int(np.argmax(ctx[nr:] + face[nr:]))]
+        out.append((round(float(fake), 3), kind, round(float(g[2 * i + 1, 0]), 3)))
+    return out
+
+
 # ── identity ───────────────────────────────────────────────────────────────────
+
+def wears_sunglasses(clip_p, eye_ratio):
+    return clip_p >= SUNGLASSES_SURE or (clip_p >= SUNGLASSES_MAYBE and eye_ratio < EYE_DARK)
+
 
 def unit(v):
     return v / (np.linalg.norm(v) + 1e-9)
@@ -371,7 +519,7 @@ def identify(accepted, anchors):
     if not accepted:
         return [], [], "no_usable_photos"
     E = np.stack([a["emb"] for a in accepted])
-    trusted = np.array([a["source"] != "search" for a in accepted])
+    trusted = np.array([a["source"] != "search" for a in accepted])  # own photo, depicts tag, own category
     thr = np.where(trusted, SIM_TRUSTED, SIM_SEARCH)
     anchor = unit(np.mean(anchors, 0)) if anchors else None
     cons, size, second = consensus(E[trusted])
@@ -404,17 +552,21 @@ def dhash(im):
 
 
 def best_unique(kept, sims):
-    """Best photos first (match x face size x detection), skipping copies/crops of one already chosen.
-    -> (chosen, number skipped as duplicates)"""
+    """Best photos first (match x face size x detection), skipping copies/crops of one already chosen
+    and capping photos from the same day. -> (chosen, number skipped as duplicates)"""
     order = sorted(range(len(kept)), key=lambda i: sims[i] * min(1.0, kept[i]["face_width"] / 200)
                    * kept[i]["det_score"], reverse=True)
-    chosen, dups = [], 0
+    chosen, dups, per_day = [], 0, collections.Counter()
     for i in order:
         a = kept[i]
         a["hash"] = dhash(a["image"])
         if any(float(a["emb"] @ b["emb"]) >= DUP_SIM or int((a["hash"] != b["hash"]).sum()) <= 4 for b in chosen):
             dups += 1
             continue
+        if a.get("date") and per_day[a["date"]] >= PER_DAY:
+            dups += 1
+            continue
+        per_day[a.get("date")] += 1
         a["similarity"] = round(sims[i], 3)
         chosen.append(a)
         if len(chosen) == MAX_KEEP:
@@ -439,6 +591,13 @@ def process(celeb, cands, dropped, keep_rejects=False):
     accepted, anchors = [], []
     futures = [DOWNLOADS.submit(download, c["url"]) for c in cands]
     for n, (c, fut) in enumerate(zip(cands, futures)):
+        # stop downloading once there's plenty that already matches the Wikidata photo, or when this
+        # person's candidates are clearly poor (downloads are the bottleneck)
+        likely = sum(float(a["emb"] @ anchors[0]) >= 0.40 for a in accepted) if anchors else len(accepted)
+        if likely >= MAX_KEEP + 3 or n >= MAX_DOWNLOADS or (n >= 30 and len(accepted) < 3):
+            for f in futures[n:]:
+                f.cancel()
+            break
         data = fut.result()
         if data is None:
             rejects["download_failed"] += 1
@@ -458,16 +617,22 @@ def process(celeb, cands, dropped, keep_rejects=False):
                 small.save(path, quality=85)
             continue
         accepted.append({**c, **d})
-        if len(accepted) >= MAX_KEEP * 2 + 5:  # plenty to choose from; stop downloading
-            for f in futures[n + 1:]:
-                f.cancel()
-            break
 
     kept, sims, problem = identify(accepted, anchors)
-    chosen, dups = best_unique(kept, sims) if not problem else ([], 0)
     if not problem:
         rejects["wrong_person"] += len(accepted) - len(kept)
-        rejects["duplicate"] += dups
+        real = []  # last gate: is it really a photograph of a person (not a bust, poster, screen...)?
+        for a, s, (fake, kind, glasses) in zip(kept, sims, photo_scores(kept)):
+            a["clip_fake"], a["clip_sunglasses"] = fake, glasses
+            if fake >= CLIP_FAKE_MAX:
+                rejects["not_a_real_photo"] += 1
+            elif wears_sunglasses(glasses, a["eye_ratio"]):
+                rejects["sunglasses"] += 1
+            else:
+                real.append((a, s))
+        kept, sims = [a for a, _ in real], [s for _, s in real]
+    chosen, dups = best_unique(kept, sims) if not problem else ([], 0)
+    rejects["duplicate"] += dups
     status = "ok" if len(chosen) >= MIN_KEEP else ("skipped" if problem else "too_few")
 
     folder = folder_of(celeb)
@@ -479,8 +644,11 @@ def process(celeb, cands, dropped, keep_rejects=False):
         im.thumbnail((THUMB_W, THUMB_W))
         im.save(os.path.join(folder, name), quality=90)
         images.append({"file": name, **{k: a[k] for k in (
-            "title", "page", "author", "license", "license_url", "attribution_required", "restrictions",
-            "source", "similarity", "det_score", "face_width", "age_estimate", "colour", "sharpness", "yaw")},
+            "title", "page", "url", "author", "license", "license_url", "attribution_required", "restrictions",
+            "source", "date", "similarity", "det_score", "face_width", "age_estimate", "colour", "sharpness",
+            "yaw", "eye_ratio", "clip_fake", "clip_sunglasses")},
+            # the verified face, in this saved image's pixels (photos can contain other people)
+            "face_box": [round(v * im.width / a["image"].width, 1) for v in a["box"]],
             "credit": f"{a['author']}, {a['license']}, via Wikimedia Commons"})
     np.save(os.path.join(folder, "faces.npy"), np.stack([a["emb"] for a in chosen]) if chosen
             else np.zeros((0, 512), np.float32))
@@ -502,9 +670,21 @@ def _check():
     ok = lambda lic: bool(LICENSE_RE.fullmatch(lic))
     assert all(map(ok, ["cc-by-sa-4.0", "cc-by-2.0", "cc-by-sa-3.0-migrated", "cc-by-3.0-us", "cc0", "pd", "pd-usgov"]))
     assert not any(map(ok, ["cc-by-nc-sa-2.0", "cc-by-nd-4.0", "cc-by-nc-2.0", "gfdl", "fal", "cc-by-sa-4.0,gfdl"]))
+    assert ok("kogl type 1") and ok("attribution")
+    assert not any(map(ok, ["kogl type 2", "kogl type 4", "ogl 3", "ogl v1.0", "godl-india", "no restrictions"]))
+    page = lambda lic, short: {"title": "File:X.jpg", "imageinfo": [{"mime": "image/jpeg", "width": 999, "height": 999,
+                               "url": "u", "extmetadata": {"License": {"value": lic}, "LicenseShortName": {"value": short}}}]}
+    kept = lambda lic, short: len(file_info([page(lic, short)], "category")[0])
+    assert kept("cc-by-sa-4.0", "CC BY-SA 4.0") and kept("", "Attribution") and kept("", "KOGL Type 1")
+    assert not kept("", "OGL 3") and not kept("", "GODL-India") and not kept("cc-by-nc-2.0", "CC BY-NC 2.0")
     assert not NON_PHOTO.search("file:kristen stewart at comic-con 2019 by gage skidmore.jpg")
     assert not NON_PHOTO.search("zendaya at the costume institute gala; avatar premiere")
     assert NON_PHOTO.search("file:wax figure of taylor swift.jpg") and NON_PHOTO.search("madame tussauds london")
+    assert NON_PHOTO.search("file:pavel durov's meme reaction on his inclusion.jpg")
+    assert not NON_PHOTO.search("file:memento premiere.jpg")
+    # sunglasses rule, on pilot photos checked by eye: (clip, eye_ratio) -> dark lenses?
+    assert wears_sunglasses(0.69, 0.31) and wears_sunglasses(0.71, 0.40) and wears_sunglasses(0.87, 0.74)
+    assert not wears_sunglasses(0.69, 0.65) and not wears_sunglasses(0.64, 0.75) and not wears_sunglasses(0.56, 0.41)
     assert not SUBCAT_SKIP.search("taylor swift at the 2023 mtv video music awards")
     assert not SUBCAT_SKIP.search("kristen stewart at the 2012 cannes film festival")
     assert SUBCAT_SKIP.search("taylor swift albums") and SUBCAT_SKIP.search("wax figures of taylor swift")

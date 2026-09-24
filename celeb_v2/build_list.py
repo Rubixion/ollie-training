@@ -22,6 +22,7 @@ import gzip
 import json
 import math
 import os
+import re
 from urllib.parse import unquote
 
 import requests
@@ -32,17 +33,23 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 CACHE = os.path.join(HERE, "cache")
 OUT = os.path.join(HERE, "celebs.json")
 UA = "OllieCelebIndex/2.0 (https://ollie.ml)"
-QLEVER = "https://qlever.cs.uni-freiburg.de/api/wikidata"
+QLEVER = "https://qlever.dev/api/wikidata"
 MONTHS = 6           # fame window
-KEEP = 7000          # ranked list length: 5000 target + backfill for people without enough usable photos
+KEEP = 12000         # ranked list length: 5000 target + backfill for people without enough licensed photos
 SL_MIN = 10          # language editions needed to be a candidate (filters one-off news subjects)
 
-EXCLUDE_OCCUPATIONS = ("porn", "adult film", "erotic", "criminal", "murderer", "serial killer",
-                       "spree killer", "terrorist", "drug lord", "drug trafficker", "gangster",
-                       "mobster", "hitman", "assassin", "rapist", "sex offender", "fraudster",
-                       "con artist", "scammer")
-EXCLUDE_CONVICTIONS = ("murder", "homicide", "manslaughter", "rape", "sexual", "child", "terror",
-                       "genocide", "war crime", "crimes against humanity", "trafficking", "kidnapping")
+# Whole words only ("rapist" must not hit "therapist"). Porn is judged by the description, i.e. what the
+# person is known for: Wikidata tags many mainstream stars "erotic photography model" for one photo shoot.
+CRIME_WORDS = re.compile(r"\b(criminal|murderer|serial killer|spree killer|mass murderer|terrorist|drug lord|"
+                         r"drug trafficker|gangster|mobster|hitman|assassin|rapist|serial rapist|sex offender|"
+                         r"fraudster|con artist|scammer|convicted)\b")
+PORN_WORDS = re.compile(r"\b(porn\w*|adult (film|content|entertainment|performer|actress|actor|model))\b")
+BAD_CONVICTIONS = re.compile(r"\b(murder|homicide|manslaughter|rape|sexual|child|terror\w*|genocide|war crimes?|"
+                             r"crimes against humanity|kidnapping)\b|\b(human|sex|child\w*|people) trafficking|"
+                             r"trafficking of (children|persons|women)")
+# no occupation on Wikidata is fine if the description shows public fame (Kris Jenner, Jay Shah)
+FAME_WORDS = re.compile(r"\b(personality|business\w*|administrator|actor|actress|singer|rapper|model|socialite|"
+                        r"influencer|presenter|host|athlete|player|politician|royal|prince|princess|king|queen)\b")
 
 PREFIXES = """PREFIX wd: <http://www.wikidata.org/entity/>
 PREFIX wdt: <http://www.wikidata.org/prop/direct/>
@@ -79,8 +86,9 @@ def cached(name, fn):
 
 
 def sparql(query):
-    r = S.get(QLEVER, params={"query": PREFIXES + query}, timeout=300,
-              headers={"Accept": "application/sparql-results+json"})
+    # POST: queries with long VALUES lists don't fit in a URL
+    r = S.post(QLEVER, data={"query": PREFIXES + query}, timeout=300,
+               headers={"Accept": "application/sparql-results+json"})
     r.raise_for_status()
     return [{k: v["value"] for k, v in row.items()} for row in r.json()["results"]["bindings"]]
 
@@ -135,9 +143,9 @@ def month_views(month, titles):
 def details(qids):
     """Birth date (+precision), photo, Commons category, label, description, occupations, convictions."""
     out = {q: {"births": [], "images": set(), "cats": set(), "label": "", "desc": "",
-               "occupations": set(), "convictions": set()} for q in qids}
-    for i in range(0, len(qids), 1500):
-        values = " ".join(f"wd:{q}" for q in qids[i:i + 1500])
+               "occupations": set(), "convictions": set(), "native": set()} for q in qids}
+    for i in range(0, len(qids), 500):
+        values = " ".join(f"wd:{q}" for q in qids[i:i + 500])
         for r in sparql(f"""SELECT ?item ?birth ?prec ?img ?cat ?commons ?label ?desc WHERE {{
           VALUES ?item {{ {values} }}
           OPTIONAL {{ ?item p:P569/psv:P569 ?bv . ?bv wikibase:timeValue ?birth ; wikibase:timePrecision ?prec }}
@@ -164,7 +172,10 @@ def details(qids):
           ?x rdfs:label ?lab FILTER(LANG(?lab) = "en")
         }}"""):
             out[qid(r["item"])]["occupations" if r["kind"] == "occ" else "convictions"].add(r["lab"])
-        print(f"  details {min(i + 1500, len(qids))}/{len(qids)}", flush=True)
+        # "name in native language": Commons often titles e.g. K-pop or Bollywood photos in that script
+        for r in sparql(f"""SELECT ?item ?n WHERE {{ VALUES ?item {{ {values} }} ?item wdt:P1559 ?n }}"""):
+            out[qid(r["item"])]["native"].add(r["n"])
+        print(f"  details {min(i + 500, len(qids))}/{len(qids)}", flush=True)
     return out
 
 
@@ -194,17 +205,25 @@ def age_on(born, today):
 
 def exclusion(d, today):
     born = latest_birth(d["births"])
+    desc = d["desc"].lower()
+    occs = " | ".join(d["occupations"]).lower()
     if born is None:
         return "no birth date"
     if age_on(born, today) < 18:
         return "under 18"
-    if not d["occupations"]:
+    if age_on(born, today) > 110:
+        return "not a living person"  # legendary/ancient figures Wikidata lists without a death date
+    if re.search(r"\b(anonymous|unidentified|unknown)\b", desc):
+        return "no known identity"
+    if not d["occupations"] and not FAME_WORDS.search(desc):
         return "no occupation"
-    for o in d["occupations"]:
-        if any(w in o.lower() for w in EXCLUDE_OCCUPATIONS):
-            return f"occupation: {o}"
+    if PORN_WORDS.search(desc) or (not desc and PORN_WORDS.search(occs)):
+        return f"adult industry: {d['desc']}"
+    for text in d["occupations"] + [d["desc"]]:
+        if CRIME_WORDS.search(text.lower()):
+            return f"crime: {text}"
     for c in d["convictions"]:
-        if any(w in c.lower() for w in EXCLUDE_CONVICTIONS):
+        if BAD_CONVICTIONS.search(c.lower()):
             return f"convicted: {c}"
     return None
 
@@ -217,9 +236,20 @@ def _check():
     assert latest_birth([("2008-02-00T00:00:00Z", 10)]) == dt.date(2008, 2, 29)   # month only
     assert age_on(dt.date(2008, 9, 23), t) == 18 and age_on(dt.date(2008, 9, 24), t) == 17
     assert latest_birth([("1964-01-23T00:00:00Z", 11), ("1964-06-23T00:00:00Z", 11)]) == dt.date(1964, 6, 23)
-    assert exclusion({"births": [], "occupations": ["actor"], "convictions": []}, t) == "no birth date"
-    assert exclusion({"births": [("1990-05-05T00:00:00Z", 11)], "occupations": ["pornographic actor"],
-                      "convictions": []}, t).startswith("occupation")
+    adult = [("1990-05-05T00:00:00Z", 11)]
+    person = lambda occ, desc="", conv=(): {"births": adult, "occupations": list(occ), "desc": desc,
+                                            "convictions": list(conv)}
+    assert exclusion({"births": [], "occupations": ["actor"], "desc": "", "convictions": []}, t) == "no birth date"
+    assert exclusion(person(["politician", "hypnotherapist"], "British politician"), t) is None   # not "rapist"
+    assert exclusion(person(["erotic photography model", "actor"], "American actress (born 1997)"), t) is None
+    assert exclusion(person(["pornographic film actor"], "American pornographic actress"), t).startswith("adult")
+    assert exclusion(person(["actor"], "actress and former pornographic actress"), t).startswith("adult")
+    assert exclusion(person(["actor"], "American actor", ["drug trafficking"]), t) is None
+    assert exclusion(person(["singer"], "American singer", ["sex trafficking"]), t).startswith("convicted")
+    assert exclusion(person([], "American media personality, socialite, and businesswoman"), t) is None
+    assert exclusion(person([], "Ukrainian-born American"), t) == "no occupation"
+    assert exclusion(person(["activist"], "anonymous man who stood in front of tanks"), t) == "no known identity"
+    assert exclusion(person(["criminal"], "Syrian politician"), t).startswith("crime")
     assert last_months(2)[-1] == f"{(dt.date.today().replace(day=1) - dt.timedelta(days=1)):%Y-%m}"
 
 
@@ -244,7 +274,7 @@ def main():
 
     ranked = sorted(people, key=score, reverse=True)[:int(KEEP * 1.6)]
     info = cached(f"details_{len(ranked)}.json", lambda: {
-        q: {**d, "images": sorted(d["images"]), "cats": sorted(d["cats"]),
+        q: {**d, "images": sorted(d["images"]), "cats": sorted(d["cats"]), "native": sorted(d["native"]),
             "occupations": sorted(d["occupations"]), "convictions": sorted(d["convictions"])}
         for q, d in details(ranked).items()})
 
@@ -262,6 +292,7 @@ def main():
             "age": age_on(latest_birth(d["births"]), today), "sitelinks": people[q]["sl"],
             f"views_{MONTHS}mo": views[q], "score": round(score(q), 4), "enwiki": title,
             "images": d["images"], "commons_categories": d["cats"],
+            "native_names": [n for n in d["native"] if n.lower() != (d["label"] or title).lower()][:2],
         })
         if len(celebs) == KEEP:
             break
