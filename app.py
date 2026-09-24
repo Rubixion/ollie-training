@@ -1424,17 +1424,17 @@ def _load_model_file(path: str):
     return m
 
 
-def _search_with_index(index_tuple, q_emb, q_feats, agg="avg"):
-    """FAISS search + feature re-ranking. Returns the top 5 players as (pil_img, caption) tuples.
-    Scoring lives in lookalike.rank_players (agg: "avg" / "first" / "best")."""
-    names, paths, fidx, index_features = index_tuple
+def _search_with_index(index_tuple, q_emb, agg="top2"):
+    """FAISS search. Returns the top 5 players as (pil_img, caption) tuples.
+    Scoring lives in lookalike.rank_players (agg: "top2" / "avg" / "first" / "best")."""
+    names, paths, fidx, _ = index_tuple
     q_emb_f = np.ascontiguousarray(q_emb.reshape(1, -1), dtype=np.float32)
     D, I    = fidx.search(q_emb_f, fidx.ntotal)  # every image, so each player's average is complete
     dist    = np.empty(fidx.ntotal, dtype=np.float32)
     dist[I[0]] = np.sqrt(np.maximum(D[0], 0.0))  # back to index order
 
     gallery = []
-    for name, score, i in rank_players(names, dist, index_features, q_feats, agg):
+    for name, score, i in rank_players(names, dist, agg):
         try:  # face = this player's best-matching image
             img = _pil_square(Image.open(paths[i]).convert('RGB'), 160)
         except Exception:
@@ -1633,9 +1633,7 @@ def search_and_compare(image):
     with torch.no_grad():
         q_emb = _load_model_file(APP_BEST).get_embedding(img_t, feats_t).cpu().numpy()[0]
 
-    galleries = [_search_with_index(_embed_index_best, q_emb,
-                                    q_feats if use_feats else _ZERO_VEC.copy(), agg)
-                 for _, use_feats, agg in SEARCH_MODES]
+    galleries = [_search_with_index(_embed_index_best, q_emb, agg) for _, agg in SEARCH_MODES]
     yield diag, *galleries
 
 
@@ -1668,7 +1666,7 @@ with gr.Blocks(title="Face Verification") as app:
     galleries = []
     for r in range(0, len(SEARCH_MODES), 2):  # one row per Features / Only pair
         with gr.Row():
-            for label, _, _ in SEARCH_MODES[r:r + 2]:
+            for label, _ in SEARCH_MODES[r:r + 2]:
                 with gr.Column():
                     gr.Markdown(f"### {label}")
                     galleries.append(gr.Gallery(label=label, columns=5, height=260))

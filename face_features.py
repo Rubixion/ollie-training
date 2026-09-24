@@ -282,23 +282,31 @@ def using_gpu() -> bool:
     return _HAVE_INSIGHT
 
 
-def aligned_face(img, size=112):
-    """PIL RGB image -> `size`x`size` ArcFace-aligned crop of its largest face (same
-    protocol as eval_lfw_aligned.py / MS1MV2, what the CNN expects). Falls back to the
-    unchanged image when InsightFace is missing or finds no face."""
+def face_and_sex(img, size=112):
+    """PIL RGB image -> (`size`x`size` ArcFace-aligned crop of its largest face, InsightFace's
+    apparent sex "F"/"M" for that face, whether a face was found). Same alignment protocol as
+    eval_lfw_aligned.py / MS1MV2, what the CNN expects. Falls back to (unchanged image, None, False)
+    when InsightFace is missing or finds no face."""
     app = _get_insight_app()
     if app is None:
-        return img
+        return img, None, False
     try:
         rgb   = np.array(img.convert('RGB'), dtype=np.uint8)
         faces = app.get(rgb[:, :, ::-1])  # detector expects BGR, like eval_lfw_aligned.py
         if faces:
             from insightface.utils.face_align import norm_crop
             face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
-            return Image.fromarray(norm_crop(rgb, face.kps, image_size=size))  # warp is channel-agnostic
+            sex = getattr(face, 'sex', None)
+            return (Image.fromarray(norm_crop(rgb, face.kps, image_size=size)),  # warp is channel-agnostic
+                    sex if sex in ('F', 'M') else None, True)
     except Exception:
         pass
-    return img
+    return img, None, False
+
+
+def aligned_face(img, size=112):
+    """PIL RGB image -> aligned crop of its largest face (see face_and_sex)."""
+    return face_and_sex(img, size)[0]
 
 
 def extract_face_features(img) -> np.ndarray:

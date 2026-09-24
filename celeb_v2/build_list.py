@@ -179,6 +179,33 @@ def details(qids):
     return out
 
 
+GENDER_QIDS = {"Q6581072": "F", "Q1052281": "F", "Q6581097": "M", "Q2449503": "M"}  # female, trans woman, male, trans man
+
+
+def genders(qids):
+    """qid -> "F" / "M" from Wikidata P21, for the site's gender filter. Anything else (non-binary,
+    several values, missing) -> "", which the filter never hides."""
+    found = {q: set() for q in qids}
+    for i in range(0, len(qids), 500):
+        values = " ".join(f"wd:{q}" for q in qids[i:i + 500])
+        for r in sparql(f"SELECT ?item ?g WHERE {{ VALUES ?item {{ {values} }} ?item wdt:P21 ?g }}"):
+            found[qid(r["item"])].add(GENDER_QIDS.get(qid(r["g"]), "?"))
+    return {q: next(iter(s)) if len(s) == 1 and s != {"?"} else "" for q, s in found.items()}
+
+
+def add_genders(path):
+    """Adds "gender" to an existing celebs.json in place (python build_list.py --genders)."""
+    with open(path, encoding="utf-8") as f:
+        celebs = json.load(f)
+    g = genders([c["qid"] for c in celebs])
+    for c in celebs:
+        c["gender"] = g[c["qid"]]
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
+        json.dump(celebs, f, ensure_ascii=False, indent=1)
+    os.replace(path + ".tmp", path)
+    print({k: sum(c["gender"] == k for c in celebs) for k in ("F", "M", "")})
+
+
 def latest_birth(births):
     """Latest possible birth date across all statements, honouring precision (9=year, 10=month, 11=day)."""
     latest = None
@@ -296,6 +323,9 @@ def main():
         })
         if len(celebs) == KEEP:
             break
+    g = genders([c["qid"] for c in celebs])
+    for c in celebs:
+        c["gender"] = g[c["qid"]]
 
     with open(OUT + ".tmp", "w", encoding="utf-8") as f:
         json.dump(celebs, f, ensure_ascii=False, indent=1)
@@ -307,4 +337,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    add_genders(OUT) if "--genders" in sys.argv else main()

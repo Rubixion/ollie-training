@@ -26,6 +26,29 @@ User-Agent.
     .venv\\Scripts\\python collect.py --pilot 200 --keep-rejects   # people spread over the ranking
     .venv\\Scripts\\python collect.py                               # rank order until TARGET are ok
 Resumable: anyone with a manifest.json is skipped (--redo redoes them).
+
+TODO after the full run finishes (planned 2026-09-23; don't change these rules mid-run):
+  1. Rescue skipped famous people (Eminem, Jane Fonda, Macaulay Culkin...). identify() skips on
+     "category_mixes_two_people" / "wikidata_photo_disagrees_with_category" even when there is a good
+     Wikidata photo. Change: if an anchor exists, seed from the anchor and keep only photos >= 0.55 to it
+     (stricter than SIM_TRUSTED); skip only when there's no anchor. Then delete the manifests whose
+     problem is one of those two and rerun collect.py (it only redoes folders without a manifest).
+  2. Retry pass: delete manifests with status too_few/skipped whose rejects include download_failed,
+     plus any "lookup failed" names in the log, and rerun once (network hiccups, not real failures).
+  3. Maybe: accept 2 photos (MIN_KEEP=2) when one of them is the person's own Wikidata photo
+     (Jack Nicholson, Tyson Fury, Sacha Baron Cohen...). Ask the user first; 3 was the agreed bar.
+  4. Vet the "European Parliament" license (36+ rejects) before adding it to LICENSE_RE.
+  5. Then: audit.py check --fix, audit.py summary, audit.py sheets and eyeball every sheet.
+  6. Regional top-up (user agreed 2026-09-24, "after"). The fame ranking uses ENGLISH Wikipedia views, so
+     at 2,366 ok people there were only 40 East Asian (13 women), 77 South Asian, 15 Southeast Asian,
+     105 Latin American, 44 Middle East, 36 African (by citizenship, Wikidata P27). Build a second list
+     (e.g. topup.json, same fields as celebs.json incl. gender) of the most famous living adults per
+     region, ranked by views on their OWN language's Wikipedia (ko, ja, zh, hi, es, pt, ar, id, th...),
+     not already in data/. Targets, about half women each: East Asia 400, South Asia 400, Latin America
+     300, Southeast Asia 200, Africa 200, Middle East 200. Same exclusion rules as build_list.py (18+,
+     no porn/serious crime). Then `collect.py --list topup.json` (it collects the whole list).
+  7. Gender: the index is ~35% women because the fame list is. The top-up targets above help; if still
+     short, collect more women further down celebs.json (user to decide how close to 50/50).
 """
 import argparse
 import collections
@@ -37,9 +60,13 @@ import json
 import os
 import queue
 import re
+import sys
 import threading
 import time
 import unicodedata
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import cv2
 import numpy as np
