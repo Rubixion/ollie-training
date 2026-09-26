@@ -17,6 +17,9 @@ POST /search   multipart: "file" (photo), optional "gender" = any | female | mal
 POST /kirk     multipart: "file", header "X-Api-Key" (the hidden /kirk-meter page)
   -> {"face_found": bool, "score": 72.4, "thumb": "data:image/jpeg;base64,..."}   # vs the photos in kirk/
 
+POST /compare  multipart: "file", "file2", header "X-Api-Key" (the hidden /compare page)
+  -> {"face_found": [bool, bool], "score": 72.4}   # how alike the two faces are, same scale as /search
+
 One mode only (the skin-tone filter is gone). Its key stays "CNN Only (best image)" so frontends
 built before this change still find it; new frontends just take the first mode.
 
@@ -159,6 +162,17 @@ def kirk(file: UploadFile = File(...), x_api_key: str = Header(default="")):
         q_emb, _, found, _ = _embed(img)
     _, score, i = rank_players(["kirk"] * len(KIRK_EMBS), np.linalg.norm(KIRK_EMBS - q_emb, axis=1), SCORE)[0]
     return {"face_found": found, "score": round(score, 1), "thumb": KIRK_THUMBS[i]}
+
+
+@app.post("/compare")
+def compare(file: UploadFile = File(...), file2: UploadFile = File(...), x_api_key: str = Header(default="")):
+    """Hidden /compare page: two photos -> {"face_found": [bool, bool], "score": raw percent (same scale as /search)}"""
+    a, b = _read_upload(file, x_api_key), _read_upload(file2, x_api_key)
+    with _lock:
+        emb_a, _, found_a, _ = _embed(a)
+        emb_b, _, found_b, _ = _embed(b)
+    _, score, _ = rank_players(["b"], [np.linalg.norm(emb_a - emb_b)], "best")[0]
+    return {"face_found": [found_a, found_b], "score": round(score, 1)}
 
 
 @app.post("/search")
