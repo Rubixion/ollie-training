@@ -27,28 +27,9 @@ User-Agent.
     .venv\\Scripts\\python collect.py                               # rank order until TARGET are ok
 Resumable: anyone with a manifest.json is skipped (--redo redoes them).
 
-TODO after the full run finishes (planned 2026-09-23; don't change these rules mid-run):
-  1. Rescue skipped famous people (Eminem, Jane Fonda, Macaulay Culkin...). identify() skips on
-     "category_mixes_two_people" / "wikidata_photo_disagrees_with_category" even when there is a good
-     Wikidata photo. Change: if an anchor exists, seed from the anchor and keep only photos >= 0.55 to it
-     (stricter than SIM_TRUSTED); skip only when there's no anchor. Then delete the manifests whose
-     problem is one of those two and rerun collect.py (it only redoes folders without a manifest).
-  2. Retry pass: delete manifests with status too_few/skipped whose rejects include download_failed,
-     plus any "lookup failed" names in the log, and rerun once (network hiccups, not real failures).
-  3. Maybe: accept 2 photos (MIN_KEEP=2) when one of them is the person's own Wikidata photo
-     (Jack Nicholson, Tyson Fury, Sacha Baron Cohen...). Ask the user first; 3 was the agreed bar.
-  4. Vet the "European Parliament" license (36+ rejects) before adding it to LICENSE_RE.
-  5. Then: audit.py check --fix, audit.py summary, audit.py sheets and eyeball every sheet.
-  6. Regional top-up (user agreed 2026-09-24, "after"). The fame ranking uses ENGLISH Wikipedia views, so
-     at 2,366 ok people there were only 40 East Asian (13 women), 77 South Asian, 15 Southeast Asian,
-     105 Latin American, 44 Middle East, 36 African (by citizenship, Wikidata P27). Build a second list
-     (e.g. topup.json, same fields as celebs.json incl. gender) of the most famous living adults per
-     region, ranked by views on their OWN language's Wikipedia (ko, ja, zh, hi, es, pt, ar, id, th...),
-     not already in data/. Targets, about half women each: East Asia 400, South Asia 400, Latin America
-     300, Southeast Asia 200, Africa 200, Middle East 200. Same exclusion rules as build_list.py (18+,
-     no porn/serious crime). Then `collect.py --list topup.json` (it collects the whole list).
-  7. Gender: the index is ~35% women because the fame list is. The top-up targets above help; if still
-     short, collect more women further down celebs.json (user to decide how close to 50/50).
+Done 2026-09-25 (was the post-run TODO): Wikidata-photo rescue (SIM_RESCUE), retry pass, 2 photos allowed when
+one is their own Wikidata photo (enough()), European Parliament license, regional top-up (topup.py), audit.
+Open: gender balance (37% women); to add women, collect further down celebs.json.
 """
 import argparse
 import collections
@@ -81,7 +62,7 @@ UA = "OllieCelebIndex/2.0 (https://ollie.ml)"
 API = "https://commons.wikimedia.org/w/api.php"
 
 TARGET = 5000          # people with >= MIN_KEEP verified photos
-MIN_KEEP, MAX_KEEP = 3, 12  # 3 verified photos is enough to match on; fewer licensed photos exist for the less famous
+MIN_KEEP, MAX_KEEP = 3, 12  # 2 is enough only when one is their own Wikidata photo (user, 2026-09-24): see enough()
 THUMB_W = 960          # a Wikimedia standard thumbnail width
 MAX_TRUSTED, MAX_SEARCH = 80, 40   # candidates per person: own photo/depicts/category, name search
 MAX_DOWNLOADS = 60     # per person; downloads are the bottleneck (robot policy: 2 at a time)
@@ -96,6 +77,7 @@ BLUR_MIN = 40.0         # Laplacian variance of the aligned 112px face
 AGE_MIN = 14            # estimated age; rejects childhood photos
 SIM_TRUSTED, SIM_SEARCH = 0.45, 0.50   # ArcFace cosine to the person's centroid
 SIM_ANCHOR_MIN = 0.25   # and never far from their own Wikidata photo
+SIM_RESCUE = 0.55       # category mixes people / disagrees with the Wikidata photo: trust only that photo, strictly
 DUP_SIM = 0.85          # same photo (crop/resize) or a near-identical frame from the same moment (pilot: 0.87-0.88)
 PER_DAY = 3             # at most this many photos taken on the same day (one event = one look)
 CLIP_FAKE_MAX = 0.72    # CLIP: probability of bust/wax/mannequin/poster/screen/render/drawing/meme (real photos <0.70)
@@ -106,7 +88,7 @@ SUNGLASSES_SURE, SUNGLASSES_MAYBE, EYE_DARK = 0.85, 0.62, 0.50
 # cc-by / cc-by-sa any version (+ jurisdiction/"migrated" suffix), cc0, public domain, and two attribution-only
 # licenses (Korea's KOGL type 1, Commons' {{Attribution}}). NC/ND never match. Not UK OGL or India's GODL:
 # both carve personal data out of the grant, and a photo of a recognisable person is personal data.
-LICENSE_RE = re.compile(r"cc0|pd|pd-[a-z0-9-]+|cc-by(-sa)?-\d(\.\d)?(-[a-z]+)*|kogl type 1|attribution")
+LICENSE_RE = re.compile(r"cc0|pd|pd-[a-z0-9-]+|cc-by(-sa)?-\d(\.\d)?(-[a-z]+)*|kogl type 1|attribution|european parliament")
 BAD_TEMPLATES = ["Template:Deletion template tag", "Template:Delete", "Template:Copyvio",
                  "Template:Speedydelete", "Template:No permission since", "Template:No license since",
                  "Template:No source since"]
@@ -550,10 +532,16 @@ def identify(accepted, anchors):
     thr = np.where(trusted, SIM_TRUSTED, SIM_SEARCH)
     anchor = unit(np.mean(anchors, 0)) if anchors else None
     cons, size, second = consensus(E[trusted])
+    problem = None
     if cons is not None and second >= 0.5 * size:
-        return [], [], "category_mixes_two_people"
-    if anchor is not None and cons is not None and size >= 4 and float(anchor @ cons) < 0.35:
-        return [], [], "wikidata_photo_disagrees_with_category"
+        problem = "category_mixes_two_people"
+    elif anchor is not None and cons is not None and size >= 4 and float(anchor @ cons) < 0.35:
+        problem = "wikidata_photo_disagrees_with_category"
+    if problem:
+        if anchor is None:
+            return [], [], problem
+        sims = E @ anchor  # rescue (Eminem, Jane Fonda...): only clear matches to their own Wikidata photo
+        return [a for a, s in zip(accepted, sims) if s >= SIM_RESCUE], [float(s) for s in sims if s >= SIM_RESCUE], None
     seed = anchor if anchor is not None else cons
     if seed is None:  # only search results: demand a strong, unambiguous majority
         cons, size, second = consensus(E)
@@ -602,6 +590,16 @@ def best_unique(kept, sims):
 
 
 # ── per person ─────────────────────────────────────────────────────────────────
+
+def enough(images):
+    return len(images) >= MIN_KEEP or (len(images) == 2 and any(a["source"] == "wikidata_photo" for a in images))
+
+
+def credit_license(a):  # the EP legal notice asks for "(c) European Union - YYYY"
+    if a["license"].lower() == "european parliament":
+        return "© European Union" + (f" - {a['date'][:4]}" if a.get("date") else "")
+    return a["license"]
+
 
 def slug(name):
     s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
@@ -660,7 +658,7 @@ def process(celeb, cands, dropped, keep_rejects=False):
         kept, sims = [a for a, _ in real], [s for _, s in real]
     chosen, dups = best_unique(kept, sims) if not problem else ([], 0)
     rejects["duplicate"] += dups
-    status = "ok" if len(chosen) >= MIN_KEEP else ("skipped" if problem else "too_few")
+    status = "ok" if enough(chosen) else ("skipped" if problem else "too_few")
 
     folder = folder_of(celeb)
     os.makedirs(folder, exist_ok=True)
@@ -676,7 +674,7 @@ def process(celeb, cands, dropped, keep_rejects=False):
             "yaw", "eye_ratio", "clip_fake", "clip_sunglasses")},
             # the verified face, in this saved image's pixels (photos can contain other people)
             "face_box": [round(v * im.width / a["image"].width, 1) for v in a["box"]],
-            "credit": f"{a['author']}, {a['license']}, via Wikimedia Commons"})
+            "credit": f"{a['author']}, {credit_license(a)}, via Wikimedia Commons"})
     np.save(os.path.join(folder, "faces.npy"), np.stack([a["emb"] for a in chosen]) if chosen
             else np.zeros((0, 512), np.float32))
     manifest = {"qid": celeb["qid"], "name": celeb["name"], "rank": celeb["rank"], "status": status,
@@ -697,7 +695,10 @@ def _check():
     ok = lambda lic: bool(LICENSE_RE.fullmatch(lic))
     assert all(map(ok, ["cc-by-sa-4.0", "cc-by-2.0", "cc-by-sa-3.0-migrated", "cc-by-3.0-us", "cc0", "pd", "pd-usgov"]))
     assert not any(map(ok, ["cc-by-nc-sa-2.0", "cc-by-nd-4.0", "cc-by-nc-2.0", "gfdl", "fal", "cc-by-sa-4.0,gfdl"]))
-    assert ok("kogl type 1") and ok("attribution")
+    assert ok("kogl type 1") and ok("attribution") and ok("european parliament")
+    wd, cat = {"source": "wikidata_photo"}, {"source": "category"}
+    assert enough([wd, cat]) and enough([cat] * 3) and not enough([cat, cat]) and not enough([wd])
+    assert credit_license({"license": "European Parliament", "date": "2019-07-02"}) == "© European Union - 2019"
     assert not any(map(ok, ["kogl type 2", "kogl type 4", "ogl 3", "ogl v1.0", "godl-india", "no restrictions"]))
     page = lambda lic, short: {"title": "File:X.jpg", "imageinfo": [{"mime": "image/jpeg", "width": 999, "height": 999,
                                "url": "u", "extmetadata": {"License": {"value": lic}, "LicenseShortName": {"value": short}}}]}
@@ -724,9 +725,11 @@ def _check():
     impostors = [photo(e, "search") for e in like(q, 3)]
     kept, sims, problem = identify(person + impostors, like(p, 1))
     assert problem is None and len(kept) == 6 and all(k["source"] == "category" for k in kept)
-    assert identify(person, like(q, 1))[2] == "wikidata_photo_disagrees_with_category"
+    assert identify(person, like(q, 1))[:3:2] == ([], None)  # disagrees with Wikidata photo: nothing of theirs kept
     mixed = [photo(e, "category") for e in like(p, 4) + like(q, 4)]
     assert identify(mixed, [])[2] == "category_mixes_two_people"
+    kept, _, problem = identify(mixed, [p])  # rescued by the Wikidata photo: only the matching 4
+    assert problem is None and len(kept) == 4 and all(float(k["emb"] @ p) > 0.5 for k in kept)
     assert identify([photo(e, "search") for e in like(p, 2) + like(q, 2)], [])[2] == "no_reliable_reference"
 
 
@@ -751,9 +754,18 @@ def main():
         if not os.path.exists(path):
             return None
         with open(path, encoding="utf-8") as f:
-            return json.load(f)["status"]
+            manifest = json.load(f)
+        return manifest["status"]
 
-    ok = sum(done(c) == "ok" for c in celebs)
+    def qualifies(c):
+        path = os.path.join(folder_of(c), "manifest.json")
+        if not os.path.exists(path):
+            return False
+        with open(path, encoding="utf-8") as f:
+            manifest = json.load(f)
+        return manifest["status"] == "ok"
+
+    ok = sum(qualifies(c) for c in celebs)
     todo = [c for c in celebs if args.redo or done(c) is None]
     print(f"{len(celebs)} people, {ok} already ok, {len(todo)} to collect", flush=True)
     face_app()
@@ -779,7 +791,7 @@ def main():
         except Exception as e:
             print(f"[{c['rank']:5d}] {c['name']}: failed ({type(e).__name__}: {e}); will retry next run", flush=True)
         if not args.pilot and ok >= TARGET:
-            print(f"reached {TARGET} people with >= {MIN_KEEP} verified photos", flush=True)
+            print(f"reached {TARGET} ok people", flush=True)
             stop.set()
             break
     print(f"done: {ok} ok", flush=True)

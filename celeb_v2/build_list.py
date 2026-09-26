@@ -51,6 +51,27 @@ BAD_CONVICTIONS = re.compile(r"\b(murder|homicide|manslaughter|rape|sexual|child
 FAME_WORDS = re.compile(r"\b(personality|business\w*|administrator|actor|actress|singer|rapper|model|socialite|"
                         r"influencer|presenter|host|athlete|player|politician|royal|prince|princess|king|queen)\b")
 
+# Landing-page categories (/actor-lookalike etc.), judged by the description, i.e. what the person is known
+# for: a singer with one film role is "American singer" and stays out of "actor". Stored per image in the
+# index as "actor|musician"; the server's category filter excludes people with no category.
+CATEGORY_RULES = {
+    "actor": re.compile(r"\bact(or|ress)\b"),
+    "musician": re.compile(r"\b(singer|rapper|musician|songwriter|vocalist|guitarist|bassist|drummer|pianist|dj)\b"),
+    # "association football" = soccer; plain "football player" too, unless it's American/Canadian/rules/Gaelic
+    # ("associaton fooball" is a typo on Ronaldinho's Wikidata entry)
+    "footballer": re.compile(r"(?<!rules )(?<!gaelic )(?<!rugby )\bfootballer\b|\bsoccer player\b|"
+                             r"\bassociati?on foo?t?ball (player|manager and (former )?player)\b|"
+                             r"(?<!american )(?<!canadian )(?<!rules )(?<!gaelic )\bfootball (player|manager and (former )?player)\b"),
+}
+NOT_SOCCER = re.compile(r"^(american|canadian)\b(?!.*\b(soccer|association|footballer)\b)")  # "American ... football player" = NFL; "footballer" = soccer
+
+
+def categories(description):
+    d = (description or "").lower()
+    return "|".join(k for k, rx in CATEGORY_RULES.items()
+                    if rx.search(d) and not (k == "footballer" and NOT_SOCCER.search(d)))
+
+
 PREFIXES = """PREFIX wd: <http://www.wikidata.org/entity/>
 PREFIX wdt: <http://www.wikidata.org/prop/direct/>
 PREFIX p: <http://www.wikidata.org/prop/>
@@ -277,6 +298,20 @@ def _check():
     assert exclusion(person([], "Ukrainian-born American"), t) == "no occupation"
     assert exclusion(person(["activist"], "anonymous man who stood in front of tanks"), t) == "no known identity"
     assert exclusion(person(["criminal"], "Syrian politician"), t).startswith("crime")
+    assert categories("American actress (born 1996)") == "actor"
+    assert categories("American singer and actress") == "actor|musician"
+    assert categories("Colombian singer-songwriter") == "musician"
+    assert categories("English footballer") == "footballer"
+    assert categories("Argentine association football player (born 1987)") == "footballer"
+    assert categories("American football player") == ""        # NFL, not soccer
+    assert categories("Australian rules footballer") == ""
+    assert categories("American professional wrestler, mixed martial artist and football player (born 1977)") == ""
+    assert categories("American soccer player") == "footballer" == categories("American footballer (born 2001)")
+    assert categories("Italian football player and manager") == "footballer"
+    assert categories("Portuguese association football manager and former player") == "footballer"
+    assert categories("Brazilian associaton fooball player (born 1980)") == "footballer"
+    assert categories("German association football manager (born 1967)") == ""
+    assert categories("contractor") == "" and categories(None) == ""   # whole words only
     assert last_months(2)[-1] == f"{(dt.date.today().replace(day=1) - dt.timedelta(days=1)):%Y-%m}"
 
 

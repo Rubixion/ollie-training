@@ -84,3 +84,6 @@ graphify-out/
 hf_space/*.py
 hf_space/thumbs/
 hf_space/imgthumbs/
+
+# Local backups (model snapshots, old hf_space copies)
+backups/

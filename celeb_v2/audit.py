@@ -136,8 +136,8 @@ def check(fix=False):
 
 
 def quarantine(flags):
-    """Moves flagged photos out and rewrites manifest + faces.npy; people left below MIN_KEEP become too_few."""
-    from collect import MIN_KEEP
+    """Moves flagged photos out and rewrites manifest + faces.npy; people left without enough() photos become too_few."""
+    from collect import enough
     for folder, items in flags.items():
         bad = {file for file, _ in items}
         with open(os.path.join(folder, "manifest.json"), encoding="utf-8") as f:
@@ -152,7 +152,7 @@ def quarantine(flags):
         m["images"] = [m["images"][i] for i in keep]
         m["kept"] = len(keep)
         m["rejects"]["audit_flagged"] = m["rejects"].get("audit_flagged", 0) + len(bad)
-        if m["kept"] < MIN_KEEP:
+        if not enough(m["images"]):
             m["status"] = "too_few"
         np.save(os.path.join(folder, "faces.npy"), E[keep] if keep else np.zeros((0, 512), np.float32))
         with open(os.path.join(folder, "manifest.json"), "w", encoding="utf-8") as f:
