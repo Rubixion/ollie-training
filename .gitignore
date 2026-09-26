@@ -87,3 +87,6 @@ hf_space/imgthumbs/
 
 # Local backups (model snapshots, old hf_space copies)
 backups/
+
+# Kirk meter reference photos (added by hand, uploaded to Modal with hf_space/)
+hf_space/kirk/
