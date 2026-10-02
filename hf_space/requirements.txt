@@ -11,3 +11,4 @@ uvicorn
 python-multipart
 matplotlib
 kagglehub
+mediapipe==1.0.1

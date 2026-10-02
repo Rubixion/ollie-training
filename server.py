@@ -20,6 +20,13 @@ POST /kirk     multipart: "file", header "X-Api-Key" (the hidden /kirk-meter pag
 POST /compare  multipart: "file", "file2", header "X-Api-Key" (the hidden /compare page)
   -> {"face_found": [bool, bool], "score": 72.4}   # how alike the two faces are, same scale as /search
 
+POST /landmarks  multipart: "file", header "X-Api-Key" (the ChatGPT apps: face symmetry test and Ollie Stylist)
+  -> {"face_found": bool, "width", "height", "yaw", "pitch", "landmarks": [[x, y], ... 478, normalised 0..1]}
+     MediaPipe Face Landmarker, the same model the browser runs, so lib/symmetry.ts and lib/style/face-shape.ts work unchanged.
+
+POST /style-scan  multipart: "file", header "X-Api-Key" (the hidden /style page)
+  -> {"face_found": bool, "age": int | None, "gender": "female" | "male" | None}   # InsightFace apparent age/sex
+
 One mode only (the skin-tone filter is gone). Its key stays "CNN Only (best image)" so frontends
 built before this change still find it; new frontends just take the first mode.
 
@@ -40,7 +47,7 @@ import torch
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from PIL import Image
 
-from face_features import face_and_sex
+from face_features import _get_insight_app, face_and_sex
 from lfw_pytorch import EMBEDDING_SIZE, SphereFaceNet, test_transform
 from lookalike import merge_duplicate_names, rank_players, thumb_name
 
@@ -173,6 +180,55 @@ def compare(file: UploadFile = File(...), file2: UploadFile = File(...), x_api_k
         emb_b, _, found_b, _ = _embed(b)
     _, score, _ = rank_players(["b"], [np.linalg.norm(emb_a - emb_b)], "best")[0]
     return {"face_found": [found_a, found_b], "score": round(score, 1)}
+
+
+_landmarker = None
+
+
+def _get_landmarker():
+    """MediaPipe Face Landmarker (face_landmarker.task next to this file), loaded on first use."""
+    global _landmarker
+    if _landmarker is None:
+        from mediapipe.tasks.python import BaseOptions, vision
+        _landmarker = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(
+            base_options=BaseOptions(model_asset_path=os.path.join(HERE, "face_landmarker.task")),
+            output_facial_transformation_matrixes=True, num_faces=1))
+    return _landmarker
+
+
+@app.post("/landmarks")
+def landmarks(file: UploadFile = File(...), x_api_key: str = Header(default="")):
+    """ChatGPT apps: one photo -> the 478-point face mesh plus head turn (same yaw/pitch formula as the browser)."""
+    import math
+    import mediapipe as mp
+    img = _read_upload(file, x_api_key)
+    with _lock:
+        res = _get_landmarker().detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(np.array(img))))
+    if not res.face_landmarks:
+        return {"face_found": False}
+    m = res.facial_transformation_matrixes[0]
+    return {
+        "face_found": True, "width": img.width, "height": img.height,
+        "yaw": math.degrees(math.atan2(m[0][2], m[2][2])),
+        "pitch": math.degrees(math.atan2(-m[1][2], math.hypot(m[0][2], m[2][2]))),
+        "landmarks": [[round(q.x, 5), round(q.y, 5)] for q in res.face_landmarks[0]],
+    }
+
+
+@app.post("/style-scan")
+def style_scan(file: UploadFile = File(...), x_api_key: str = Header(default="")):
+    """Hidden /style page: one camera frame -> {"face_found": bool, "age": int | None, "gender": "female" | "male" | None}.
+    InsightFace's apparent age (about ±5 years), used only to offer a "look older / younger" goal."""
+    img = _read_upload(file, x_api_key)
+    fa = _get_insight_app()
+    if fa is None:
+        raise HTTPException(503, "Face model not loaded")
+    with _lock:
+        faces = fa.get(np.array(img)[:, :, ::-1])
+    if not faces:
+        return {"face_found": False, "age": None, "gender": None}
+    face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
+    return {"face_found": True, "age": int(face.age), "gender": {"F": "female", "M": "male"}.get(getattr(face, "sex", None))}
 
 
 @app.post("/search")
