@@ -3,7 +3,8 @@ straight-on photos in data/, the same measurement as ollie-frontend/lib/style/fa
 
     .venv\\Scripts\\python face_norms.py      -> face_norms.json (paste mean/std into NORMS in face-shape.ts)
 
-Also keeps each person's average ratios, for "celebrities with your face shape" later.
+Also keeps each person's average ratios (for "celebrities with your face shape") and each photo's ratios
+(for the repeatability check in face_shape_fit.py).
 """
 import json, math, os
 
@@ -33,7 +34,7 @@ def main():
     lmk = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(
         base_options=BaseOptions(model_asset_path=os.path.join(HERE, "models", "face_landmarker.task")),
         output_facial_transformation_matrixes=True, num_faces=1))
-    rows, people = [], {}
+    rows, people, photos = [], {}, {}  # photos: each straight-on photo's ratios, for the repeatability check
     dirs = sorted(os.listdir(os.path.join(HERE, "data")))
     for n, person in enumerate(dirs):
         folder = os.path.join(HERE, "data", person)
@@ -57,11 +58,12 @@ def main():
         if mine:
             rows += mine
             people[person] = np.mean(mine, 0).round(4).tolist()
+            photos[person] = [np.round(r, 4).tolist() for r in mine]
         if n % 500 == 0:
             print(f"{n}/{len(dirs)} people, {len(rows)} frontal photos", flush=True)
 
     a = np.array(rows)
-    out = {"n": len(a), "mean": a.mean(0).round(4).tolist(), "std": a.std(0).round(4).tolist(), "people": people}
+    out = {"n": len(a), "mean": a.mean(0).round(4).tolist(), "std": a.std(0).round(4).tolist(), "people": people, "photos": photos}
     json.dump(out, open(os.path.join(HERE, "face_norms.json"), "w"))
     print("n", out["n"], "mean", out["mean"], "std", out["std"])
 

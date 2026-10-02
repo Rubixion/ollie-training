@@ -1,0 +1,1758 @@
+{
+ "n": 4032,
+ "live_index_people": 5955,
+ "shares": {
+  "oval": {
+   "count": 889,
+   "pct": 22.0,
+   "confident": 0
+  },
+  "heart": {
+   "count": 727,
+   "pct": 18.0,
+   "confident": 349
+  },
+  "triangle": {
+   "count": 586,
+   "pct": 14.5,
+   "confident": 181
+  },
+  "round": {
+   "count": 491,
+   "pct": 12.2,
+   "confident": 81
+  },
+  "oblong": {
+   "count": 486,
+   "pct": 12.1,
+   "confident": 153
+  },
+  "square": {
+   "count": 478,
+   "pct": 11.9,
+   "confident": 124
+  },
+  "diamond": {
+   "count": 375,
+   "pct": 9.3,
+   "confident": 61
+  }
+ },
+ "by_gender": {
+  "M": {
+   "n": 2568,
+   "oval": 21.2,
+   "square": 16.7,
+   "triangle": 15.7,
+   "round": 15.2,
+   "oblong": 13.8,
+   "heart": 12.9,
+   "diamond": 4.6
+  },
+  "F": {
+   "n": 1441,
+   "heart": 26.9,
+   "oval": 23.6,
+   "diamond": 17.8,
+   "triangle": 12.6,
+   "oblong": 9.0,
+   "round": 7.0,
+   "square": 3.1
+  }
+ },
+ "examples": {
+  "oval": [],
+  "round": [
+   {
+    "name": "Leo XIV",
+    "rank": 46,
+    "gender": "M",
+    "p": 0.584,
+    "description": "267th Pope of the Catholic Church (2025–)"
+   },
+   {
+    "name": "José Mourinho",
+    "rank": 70,
+    "gender": "M",
+    "p": 0.592,
+    "description": "Portuguese association football manager and former player"
+   },
+   {
+    "name": "Sadie Sink",
+    "rank": 145,
+    "gender": "F",
+    "p": 0.528,
+    "description": "American actress (born 2002)"
+   },
+   {
+    "name": "Max Verstappen",
+    "rank": 303,
+    "gender": "M",
+    "p": 0.691,
+    "description": "Dutch and Belgian racing driver"
+   },
+   {
+    "name": "Virat Kohli",
+    "rank": 376,
+    "gender": "M",
+    "p": 0.702,
+    "description": "Indian cricket player (born 1988)"
+   },
+   {
+    "name": "Emiliano Martínez",
+    "rank": 379,
+    "gender": "M",
+    "p": 0.524,
+    "description": "Argentine footballer (born 1992)"
+   },
+   {
+    "name": "Bill Pullman",
+    "rank": 517,
+    "gender": "M",
+    "p": 0.532,
+    "description": "American actor (born 1953)"
+   },
+   {
+    "name": "Jensen Huang",
+    "rank": 584,
+    "gender": "M",
+    "p": 0.649,
+    "description": "American entrepreneur and businessman; co-founder and CEO of Nvidia"
+   },
+   {
+    "name": "Ed Sheeran",
+    "rank": 713,
+    "gender": "M",
+    "p": 0.507,
+    "description": "English singer-songwriter (born 1991)"
+   },
+   {
+    "name": "Sadio Mané",
+    "rank": 830,
+    "gender": "M",
+    "p": 0.516,
+    "description": "Senegalese footballer (born 1992)"
+   },
+   {
+    "name": "Lando Norris",
+    "rank": 958,
+    "gender": "M",
+    "p": 0.638,
+    "description": "British and Belgian racing driver (born 1999)"
+   },
+   {
+    "name": "Alan Alda",
+    "rank": 1161,
+    "gender": "M",
+    "p": 0.511,
+    "description": "American actor (born 1936)"
+   },
+   {
+    "name": "Luiz Inácio Lula da Silva",
+    "rank": 1272,
+    "gender": "M",
+    "p": 0.596,
+    "description": "president of Brazil from 2003 to 2011 and since 2023"
+   },
+   {
+    "name": "Andrea Bocelli",
+    "rank": 1376,
+    "gender": "M",
+    "p": 0.6,
+    "description": "Italian tenor and singer-songwriter (born 1958)"
+   },
+   {
+    "name": "Tom Welling",
+    "rank": 1471,
+    "gender": "M",
+    "p": 0.578,
+    "description": "American actor, director, and model"
+   },
+   {
+    "name": "Samuel Eto'o",
+    "rank": 1681,
+    "gender": "M",
+    "p": 0.65,
+    "description": "Cameroonian association football player"
+   },
+   {
+    "name": "Kyle MacLachlan",
+    "rank": 1858,
+    "gender": "M",
+    "p": 0.57,
+    "description": "American actor"
+   },
+   {
+    "name": "Carl XVI Gustaf of Sweden",
+    "rank": 1868,
+    "gender": "M",
+    "p": 0.757,
+    "description": "King of Sweden since 1973"
+   },
+   {
+    "name": "Andy Richter",
+    "rank": 1966,
+    "gender": "M",
+    "p": 0.87,
+    "description": "American actor and comedian"
+   },
+   {
+    "name": "Brandon Sanderson",
+    "rank": 2031,
+    "gender": "M",
+    "p": 0.523,
+    "description": "American fantasy writer (born 1975)"
+   },
+   {
+    "name": "Mark Kelly",
+    "rank": 2095,
+    "gender": "M",
+    "p": 0.594,
+    "description": "American politician, astronaut, and naval officer (born 1964)"
+   },
+   {
+    "name": "João Neves",
+    "rank": 2150,
+    "gender": "M",
+    "p": 0.525,
+    "description": "Portuguese footballer (born 2004)"
+   },
+   {
+    "name": "Finn Wolfhard",
+    "rank": 2279,
+    "gender": "M",
+    "p": 0.575,
+    "description": "Canadian actor and musician (born 2002)"
+   },
+   {
+    "name": "Oscar Piastri",
+    "rank": 2347,
+    "gender": "M",
+    "p": 0.549,
+    "description": "Australian racing driver"
+   },
+   {
+    "name": "Ryan Hurst",
+    "rank": 2355,
+    "gender": "M",
+    "p": 0.532,
+    "description": "American actor"
+   },
+   {
+    "name": "Ronald Koeman",
+    "rank": 2381,
+    "gender": "M",
+    "p": 0.591,
+    "description": "Dutch football coach and former football player (born 1963)"
+   },
+   {
+    "name": "Daniel Kaluuya",
+    "rank": 2438,
+    "gender": "M",
+    "p": 0.578,
+    "description": "British actor (born 1989)"
+   },
+   {
+    "name": "Jeffrey Wright",
+    "rank": 2493,
+    "gender": "M",
+    "p": 0.507,
+    "description": "American actor (born 1965)"
+   },
+   {
+    "name": "Drake Bell",
+    "rank": 2588,
+    "gender": "M",
+    "p": 0.569,
+    "description": "American actor (born 1986)"
+   },
+   {
+    "name": "Oliver Kahn",
+    "rank": 2625,
+    "gender": "M",
+    "p": 0.652,
+    "description": "German association football player (born 1969)"
+   },
+   {
+    "name": "Louis Tomlinson",
+    "rank": 2654,
+    "gender": "M",
+    "p": 0.625,
+    "description": "English singer and songwriter"
+   },
+   {
+    "name": "Lukita Maxwell",
+    "rank": 2682,
+    "gender": "F",
+    "p": 0.588,
+    "description": "Indonesian-American actress"
+   },
+   {
+    "name": "Byron Donalds",
+    "rank": 2775,
+    "gender": "M",
+    "p": 0.573,
+    "description": "United States Representative from Florida since 2021"
+   },
+   {
+    "name": "A. R. Rahman",
+    "rank": 2779,
+    "gender": "M",
+    "p": 0.506,
+    "description": "Indian composer and musician"
+   },
+   {
+    "name": "Dave Mustaine",
+    "rank": 2845,
+    "gender": "M",
+    "p": 0.541,
+    "description": "American musician"
+   },
+   {
+    "name": "Suzi Quatro",
+    "rank": 2898,
+    "gender": "F",
+    "p": 0.592,
+    "description": "American rock musician (born 1950)"
+   },
+   {
+    "name": "Barry Levinson",
+    "rank": 2968,
+    "gender": "M",
+    "p": 0.647,
+    "description": "American screenwriter, film director, actor, and producer"
+   },
+   {
+    "name": "Yoweri Museveni",
+    "rank": 3038,
+    "gender": "M",
+    "p": 0.546,
+    "description": "President of Uganda since 1986"
+   },
+   {
+    "name": "Megan Rapinoe",
+    "rank": 3081,
+    "gender": "F",
+    "p": 0.601,
+    "description": "American soccer player (born 1985)"
+   },
+   {
+    "name": "Jack Ma",
+    "rank": 3109,
+    "gender": "M",
+    "p": 0.868,
+    "description": "Chinese businessman"
+   }
+  ],
+  "square": [
+   {
+    "name": "Mojtaba Khamenei",
+    "rank": 24,
+    "gender": "M",
+    "p": 0.549,
+    "description": "3rd Supreme Dictator of Iran since 2026"
+   },
+   {
+    "name": "Gianni Infantino",
+    "rank": 32,
+    "gender": "M",
+    "p": 0.536,
+    "description": "Swiss-Italian-Lebanese football administrator"
+   },
+   {
+    "name": "Sean Penn",
+    "rank": 122,
+    "gender": "M",
+    "p": 0.804,
+    "description": "American actor"
+   },
+   {
+    "name": "Ella Langley",
+    "rank": 285,
+    "gender": "F",
+    "p": 0.842,
+    "description": "American country singer"
+   },
+   {
+    "name": "Teyana Taylor",
+    "rank": 383,
+    "gender": "F",
+    "p": 0.551,
+    "description": "American singer-songwriter and actress (born 1990)"
+   },
+   {
+    "name": "Adele",
+    "rank": 518,
+    "gender": "F",
+    "p": 0.516,
+    "description": "English singer-songwriter (born 1988)"
+   },
+   {
+    "name": "Shania Twain",
+    "rank": 585,
+    "gender": "F",
+    "p": 0.5,
+    "description": "Canadian country music singer and songwriter (born 1965)"
+   },
+   {
+    "name": "Paul Pogba",
+    "rank": 587,
+    "gender": "M",
+    "p": 0.757,
+    "description": "French footballer (born 1993)"
+   },
+   {
+    "name": "Kevin Durant",
+    "rank": 588,
+    "gender": "M",
+    "p": 0.523,
+    "description": "American basketball player (born 1988)"
+   },
+   {
+    "name": "50 Cent",
+    "rank": 645,
+    "gender": "M",
+    "p": 0.718,
+    "description": "American rapper and actor (born 1975)"
+   },
+   {
+    "name": "Kevin Hart",
+    "rank": 650,
+    "gender": "M",
+    "p": 0.521,
+    "description": "American comedian and actor (born 1979)"
+   },
+   {
+    "name": "Justin Gaethje",
+    "rank": 695,
+    "gender": "M",
+    "p": 0.508,
+    "description": "American mixed martial artist"
+   },
+   {
+    "name": "Peter Dinklage",
+    "rank": 706,
+    "gender": "M",
+    "p": 0.507,
+    "description": "American actor (born 1969)"
+   },
+   {
+    "name": "Snoop Dogg",
+    "rank": 715,
+    "gender": "M",
+    "p": 0.629,
+    "description": "American rapper (born 1971)"
+   },
+   {
+    "name": "David Harbour",
+    "rank": 727,
+    "gender": "M",
+    "p": 0.628,
+    "description": "American actor (born 1975)"
+   },
+   {
+    "name": "Andre Agassi",
+    "rank": 757,
+    "gender": "M",
+    "p": 0.663,
+    "description": "American tennis player (born 1970)"
+   },
+   {
+    "name": "Terry Crews",
+    "rank": 885,
+    "gender": "M",
+    "p": 0.537,
+    "description": "American actor, television host, and American football player (born 1968)"
+   },
+   {
+    "name": "Spike Lee",
+    "rank": 951,
+    "gender": "M",
+    "p": 0.588,
+    "description": "American filmmaker (born 1957)"
+   },
+   {
+    "name": "Jordan Peele",
+    "rank": 969,
+    "gender": "M",
+    "p": 0.523,
+    "description": "American actor, comedian and filmmaker (born 1979)"
+   },
+   {
+    "name": "Mahershala Ali",
+    "rank": 1059,
+    "gender": "M",
+    "p": 0.686,
+    "description": "American actor"
+   },
+   {
+    "name": "Jon Jones",
+    "rank": 1095,
+    "gender": "M",
+    "p": 0.502,
+    "description": "American mixed martial arts fighter"
+   },
+   {
+    "name": "Hayden Christensen",
+    "rank": 1181,
+    "gender": "M",
+    "p": 0.57,
+    "description": "Canadian actor (born 1981)"
+   },
+   {
+    "name": "Alexi Lalas",
+    "rank": 1217,
+    "gender": "M",
+    "p": 0.513,
+    "description": "American soccer player"
+   },
+   {
+    "name": "Jonathan Majors",
+    "rank": 1291,
+    "gender": "M",
+    "p": 0.594,
+    "description": "American actor (born 1989)"
+   },
+   {
+    "name": "James Hetfield",
+    "rank": 1303,
+    "gender": "M",
+    "p": 0.535,
+    "description": "American guitarist and singer"
+   },
+   {
+    "name": "Peter Jackson",
+    "rank": 1327,
+    "gender": "M",
+    "p": 0.586,
+    "description": "New Zealand film director, screenwriter, producer and actor (born 1961)"
+   },
+   {
+    "name": "Noni Madueke",
+    "rank": 1329,
+    "gender": "M",
+    "p": 0.736,
+    "description": "English footballer (born 2002)"
+   },
+   {
+    "name": "Axl Rose",
+    "rank": 1426,
+    "gender": "M",
+    "p": 0.565,
+    "description": "American singer-songwriter (born 1962)"
+   },
+   {
+    "name": "Patrick Ewing",
+    "rank": 1490,
+    "gender": "M",
+    "p": 0.588,
+    "description": "Jamaican-American basketball player"
+   },
+   {
+    "name": "Keith David",
+    "rank": 1513,
+    "gender": "M",
+    "p": 0.58,
+    "description": "American actor"
+   },
+   {
+    "name": "Ibrahim Traoré",
+    "rank": 1516,
+    "gender": "M",
+    "p": 0.505,
+    "description": "military leader of Burkina Faso since 2022"
+   },
+   {
+    "name": "David Letterman",
+    "rank": 1552,
+    "gender": "M",
+    "p": 0.539,
+    "description": "American comedian and television host"
+   },
+   {
+    "name": "Alexander Sørloth",
+    "rank": 1588,
+    "gender": "M",
+    "p": 0.684,
+    "description": "Norwegian association football player (born 1995)"
+   },
+   {
+    "name": "Barry Gibb",
+    "rank": 1608,
+    "gender": "M",
+    "p": 0.619,
+    "description": "British musician"
+   },
+   {
+    "name": "Dwyane Wade",
+    "rank": 1679,
+    "gender": "M",
+    "p": 0.583,
+    "description": "American basketball player (born 1982)"
+   },
+   {
+    "name": "Noah Centineo",
+    "rank": 1715,
+    "gender": "M",
+    "p": 0.536,
+    "description": "American actor"
+   },
+   {
+    "name": "Allen Iverson",
+    "rank": 1732,
+    "gender": "M",
+    "p": 0.583,
+    "description": "American basketball player (born 1975)"
+   },
+   {
+    "name": "Aaron Rodgers",
+    "rank": 1743,
+    "gender": "M",
+    "p": 0.623,
+    "description": "American football player (born 1983)"
+   },
+   {
+    "name": "Chris Tucker",
+    "rank": 1802,
+    "gender": "M",
+    "p": 0.511,
+    "description": "American actor and comedian"
+   },
+   {
+    "name": "James Taylor",
+    "rank": 1809,
+    "gender": "M",
+    "p": 0.568,
+    "description": "American singer and guitarist"
+   }
+  ],
+  "oblong": [
+   {
+    "name": "Barack Obama",
+    "rank": 15,
+    "gender": "M",
+    "p": 0.645,
+    "description": "44th President of the United States (2009–2017)"
+   },
+   {
+    "name": "Jalen Brunson",
+    "rank": 65,
+    "gender": "M",
+    "p": 0.541,
+    "description": "American basketball player (born 1996)"
+   },
+   {
+    "name": "Jon Bernthal",
+    "rank": 97,
+    "gender": "M",
+    "p": 0.608,
+    "description": "American actor"
+   },
+   {
+    "name": "William, Prince of Wales",
+    "rank": 184,
+    "gender": "M",
+    "p": 0.709,
+    "description": "heir apparent to the throne of the United Kingdom and 14 Commonwealth Realms"
+   },
+   {
+    "name": "Marc Hagit Cucurella",
+    "rank": 186,
+    "gender": "M",
+    "p": 0.67,
+    "description": "Spanish association football player"
+   },
+   {
+    "name": "Adam Sandler",
+    "rank": 260,
+    "gender": "M",
+    "p": 0.669,
+    "description": "American actor and comedian"
+   },
+   {
+    "name": "Mark Zuckerberg",
+    "rank": 278,
+    "gender": "M",
+    "p": 0.512,
+    "description": "American Internet entrepreneur"
+   },
+   {
+    "name": "Rishi Sunak",
+    "rank": 314,
+    "gender": "M",
+    "p": 0.696,
+    "description": "Prime Minister of the United Kingdom from 2022 to 2024"
+   },
+   {
+    "name": "Jeremy Clarkson",
+    "rank": 341,
+    "gender": "M",
+    "p": 0.71,
+    "description": "British broadcaster, journalist and writer"
+   },
+   {
+    "name": "Kamala Harris",
+    "rank": 343,
+    "gender": "F",
+    "p": 0.571,
+    "description": "Vice President of the United States from 2021 to 2025"
+   },
+   {
+    "name": "Catherine, Princess of Wales",
+    "rank": 438,
+    "gender": "F",
+    "p": 0.741,
+    "description": "member of the British Royal Family and princess of Wales since 2022"
+   },
+   {
+    "name": "Queen Camilla",
+    "rank": 510,
+    "gender": "F",
+    "p": 0.637,
+    "description": "Queen consort of the United Kingdom since 2022"
+   },
+   {
+    "name": "Yan Diomande",
+    "rank": 552,
+    "gender": "M",
+    "p": 0.66,
+    "description": "Ivorian footballer"
+   },
+   {
+    "name": "Jay-Z",
+    "rank": 605,
+    "gender": "M",
+    "p": 0.609,
+    "description": "American rapper, record producer, and entrepreneur"
+   },
+   {
+    "name": "Gareth Bale",
+    "rank": 636,
+    "gender": "M",
+    "p": 0.599,
+    "description": "Welsh association football player"
+   },
+   {
+    "name": "Tenzin Gyatso",
+    "rank": 700,
+    "gender": "M",
+    "p": 0.562,
+    "description": "14th Dalai Lama, the spiritual and temporal leader of Tibetans"
+   },
+   {
+    "name": "Sarah Jessica Parker",
+    "rank": 710,
+    "gender": "F",
+    "p": 0.574,
+    "description": "American actress (born 1965)"
+   },
+   {
+    "name": "Glen Powell",
+    "rank": 744,
+    "gender": "M",
+    "p": 0.502,
+    "description": "American actor"
+   },
+   {
+    "name": "Vajiralongkorn",
+    "rank": 772,
+    "gender": "M",
+    "p": 0.612,
+    "description": "King of Thailand since 2016"
+   },
+   {
+    "name": "Paul Rudd",
+    "rank": 786,
+    "gender": "M",
+    "p": 0.618,
+    "description": "American actor"
+   },
+   {
+    "name": "Joseph Fiennes",
+    "rank": 851,
+    "gender": "M",
+    "p": 0.687,
+    "description": "English film and stage actor (born 1970)"
+   },
+   {
+    "name": "Fergie",
+    "rank": 935,
+    "gender": "F",
+    "p": 0.587,
+    "description": "American singer, rapper and actress"
+   },
+   {
+    "name": "Laurie Metcalf",
+    "rank": 944,
+    "gender": "F",
+    "p": 0.694,
+    "description": "American actress (born 1955)"
+   },
+   {
+    "name": "Lionel Richie",
+    "rank": 997,
+    "gender": "M",
+    "p": 0.765,
+    "description": "American singer, songwriter and actor"
+   },
+   {
+    "name": "Cindy Crawford",
+    "rank": 1022,
+    "gender": "F",
+    "p": 0.734,
+    "description": "American model (born 1966)"
+   },
+   {
+    "name": "Tim Duncan",
+    "rank": 1049,
+    "gender": "M",
+    "p": 0.701,
+    "description": "American basketball player (born 1976)"
+   },
+   {
+    "name": "Keegan-Michael Key",
+    "rank": 1079,
+    "gender": "M",
+    "p": 0.516,
+    "description": "American actor and comedian"
+   },
+   {
+    "name": "Hilary Swank",
+    "rank": 1085,
+    "gender": "F",
+    "p": 0.899,
+    "description": "American actress (born 1974)"
+   },
+   {
+    "name": "Madeleine Stowe",
+    "rank": 1111,
+    "gender": "F",
+    "p": 0.555,
+    "description": "American actress (born 1958)"
+   },
+   {
+    "name": "Patrick Wilson",
+    "rank": 1124,
+    "gender": "M",
+    "p": 0.518,
+    "description": "American actor"
+   },
+   {
+    "name": "John Kerry",
+    "rank": 1211,
+    "gender": "M",
+    "p": 0.681,
+    "description": "American politician and diplomat (born 1943)"
+   },
+   {
+    "name": "Jerry Seinfeld",
+    "rank": 1213,
+    "gender": "M",
+    "p": 0.792,
+    "description": "American comedian and actor"
+   },
+   {
+    "name": "Dan Aykroyd",
+    "rank": 1370,
+    "gender": "M",
+    "p": 0.84,
+    "description": "Canadian-American actor (born 1952)"
+   },
+   {
+    "name": "Cheryl Hines",
+    "rank": 1443,
+    "gender": "F",
+    "p": 0.547,
+    "description": "American actress"
+   },
+   {
+    "name": "Mira Nair",
+    "rank": 1488,
+    "gender": "F",
+    "p": 0.537,
+    "description": "Indian-American filmmaker (born 1957)"
+   },
+   {
+    "name": "Nora Fatehi",
+    "rank": 1590,
+    "gender": "F",
+    "p": 0.569,
+    "description": "Canadian actress (1992-present)"
+   },
+   {
+    "name": "David Schwimmer",
+    "rank": 1611,
+    "gender": "M",
+    "p": 0.601,
+    "description": "American actor (born 1966)"
+   },
+   {
+    "name": "Dev Patel",
+    "rank": 1637,
+    "gender": "M",
+    "p": 0.677,
+    "description": "British actor (born 1990)"
+   },
+   {
+    "name": "John C. McGinley",
+    "rank": 1660,
+    "gender": "M",
+    "p": 0.664,
+    "description": "American actor"
+   },
+   {
+    "name": "Luís Figo",
+    "rank": 1683,
+    "gender": "M",
+    "p": 0.502,
+    "description": "Portuguese football player (born 1972)"
+   }
+  ],
+  "heart": [
+   {
+    "name": "Michael Olise",
+    "rank": 37,
+    "gender": "M",
+    "p": 0.565,
+    "description": "French footballer (born 2001)"
+   },
+   {
+    "name": "Ariana Grande",
+    "rank": 38,
+    "gender": "F",
+    "p": 0.81,
+    "description": "American singer, songwriter, and actress (born 1993)"
+   },
+   {
+    "name": "David Beckham",
+    "rank": 47,
+    "gender": "M",
+    "p": 0.673,
+    "description": "English footballer (born 1975)"
+   },
+   {
+    "name": "Sydney Sweeney",
+    "rank": 56,
+    "gender": "F",
+    "p": 0.787,
+    "description": "American actress (born 1997)"
+   },
+   {
+    "name": "Zara Larsson",
+    "rank": 77,
+    "gender": "F",
+    "p": 0.574,
+    "description": "Swedish singer-songwriter (born 1997)"
+   },
+   {
+    "name": "Anya Taylor-Joy",
+    "rank": 118,
+    "gender": "F",
+    "p": 0.71,
+    "description": "American actress and model (born 1996)"
+   },
+   {
+    "name": "Tiger Woods",
+    "rank": 120,
+    "gender": "M",
+    "p": 0.597,
+    "description": "American golfer"
+   },
+   {
+    "name": "Giorgia Meloni",
+    "rank": 124,
+    "gender": "F",
+    "p": 0.582,
+    "description": "Prime Minister of Italy since 2022"
+   },
+   {
+    "name": "Beyoncé",
+    "rank": 151,
+    "gender": "F",
+    "p": 0.821,
+    "description": "American singer-songwriter (born 1981)"
+   },
+   {
+    "name": "Robert Lewandowski",
+    "rank": 156,
+    "gender": "M",
+    "p": 0.691,
+    "description": "Polish association football player (born 1988)"
+   },
+   {
+    "name": "Billie Eilish",
+    "rank": 159,
+    "gender": "F",
+    "p": 0.559,
+    "description": "American singer-songwriter (born 2001)"
+   },
+   {
+    "name": "Selena Gomez",
+    "rank": 167,
+    "gender": "F",
+    "p": 0.505,
+    "description": "American singer and actress (born 1992)"
+   },
+   {
+    "name": "Kylie Jenner",
+    "rank": 181,
+    "gender": "F",
+    "p": 0.575,
+    "description": "American media personality"
+   },
+   {
+    "name": "Paul Thomas Anderson",
+    "rank": 208,
+    "gender": "M",
+    "p": 0.869,
+    "description": "American filmmaker (born 1970)"
+   },
+   {
+    "name": "Lupita Nyong'o",
+    "rank": 214,
+    "gender": "F",
+    "p": 0.754,
+    "description": "Mexican-Kenyan actress and film director (born 1983)"
+   },
+   {
+    "name": "Alexandria Ocasio-Cortez",
+    "rank": 247,
+    "gender": "F",
+    "p": 0.776,
+    "description": "American politician (born 1989)"
+   },
+   {
+    "name": "Reese Witherspoon",
+    "rank": 270,
+    "gender": "F",
+    "p": 0.628,
+    "description": "American actress (born 1976)"
+   },
+   {
+    "name": "Dakota Fanning",
+    "rank": 279,
+    "gender": "F",
+    "p": 0.609,
+    "description": "American actress and model  (born 1994)"
+   },
+   {
+    "name": "Blake Lively",
+    "rank": 281,
+    "gender": "F",
+    "p": 0.619,
+    "description": "American actress (born 1987)"
+   },
+   {
+    "name": "Milly Alcock",
+    "rank": 301,
+    "gender": "F",
+    "p": 0.543,
+    "description": "Australian actress (born 2000)"
+   },
+   {
+    "name": "Woody Allen",
+    "rank": 319,
+    "gender": "M",
+    "p": 0.661,
+    "description": "American filmmaker, actor and comedian (born 1935)"
+   },
+   {
+    "name": "Amanda Seyfried",
+    "rank": 321,
+    "gender": "F",
+    "p": 0.698,
+    "description": "American actress (born 1985)"
+   },
+   {
+    "name": "Michael Caine",
+    "rank": 331,
+    "gender": "M",
+    "p": 0.603,
+    "description": "English actor (born 1933)"
+   },
+   {
+    "name": "Carey Mulligan",
+    "rank": 332,
+    "gender": "F",
+    "p": 0.89,
+    "description": "British actress (born 1985)"
+   },
+   {
+    "name": "Kristen Stewart",
+    "rank": 382,
+    "gender": "F",
+    "p": 0.666,
+    "description": "American actress (born 1990)"
+   },
+   {
+    "name": "Idris Elba",
+    "rank": 385,
+    "gender": "M",
+    "p": 0.641,
+    "description": "British actor"
+   },
+   {
+    "name": "Lena Dunham",
+    "rank": 388,
+    "gender": "F",
+    "p": 0.655,
+    "description": "American writer, director, actress, and producer (born 1986)"
+   },
+   {
+    "name": "Taylor Sheridan",
+    "rank": 394,
+    "gender": "M",
+    "p": 0.509,
+    "description": "American producer, screenwriter and director (born 1970)"
+   },
+   {
+    "name": "Helena Bonham Carter",
+    "rank": 396,
+    "gender": "F",
+    "p": 0.633,
+    "description": "British actress (born 1966)"
+   },
+   {
+    "name": "Charli XCX",
+    "rank": 397,
+    "gender": "F",
+    "p": 0.56,
+    "description": "British singer (born 1992)"
+   },
+   {
+    "name": "Diana Ross",
+    "rank": 400,
+    "gender": "F",
+    "p": 0.654,
+    "description": "American singer and actress (1944-2026)"
+   },
+   {
+    "name": "Samantha Morton",
+    "rank": 421,
+    "gender": "F",
+    "p": 0.989,
+    "description": "British actress"
+   },
+   {
+    "name": "Keira Knightley",
+    "rank": 443,
+    "gender": "F",
+    "p": 0.704,
+    "description": "British actress (born 1985)"
+   },
+   {
+    "name": "Ronda Rousey",
+    "rank": 470,
+    "gender": "F",
+    "p": 0.883,
+    "description": "American former mixed martial arts (MMA) fighter, professional wrestler, and judoka"
+   },
+   {
+    "name": "Edward Norton",
+    "rank": 473,
+    "gender": "M",
+    "p": 0.546,
+    "description": "American actor"
+   },
+   {
+    "name": "Billy Bob Thornton",
+    "rank": 486,
+    "gender": "M",
+    "p": 0.588,
+    "description": "American actor, filmmaker, and musician"
+   },
+   {
+    "name": "Ridley Scott",
+    "rank": 508,
+    "gender": "M",
+    "p": 0.697,
+    "description": "English filmmaker (born 1937)"
+   },
+   {
+    "name": "Brenda Song",
+    "rank": 543,
+    "gender": "F",
+    "p": 0.761,
+    "description": "American actress and model (born 1988)"
+   },
+   {
+    "name": "Paris Hilton",
+    "rank": 556,
+    "gender": "F",
+    "p": 0.717,
+    "description": "American media personality (born 1981)"
+   },
+   {
+    "name": "Lily Collins",
+    "rank": 563,
+    "gender": "F",
+    "p": 0.741,
+    "description": "British-American actress (born 1989)"
+   }
+  ],
+  "diamond": [
+   {
+    "name": "Christian Pulisic",
+    "rank": 127,
+    "gender": "M",
+    "p": 0.706,
+    "description": "American soccer player (born 1998)"
+   },
+   {
+    "name": "Jennifer Lawrence",
+    "rank": 161,
+    "gender": "F",
+    "p": 0.531,
+    "description": "American actress and producer (born 1990)"
+   },
+   {
+    "name": "Trisha Krishnan",
+    "rank": 426,
+    "gender": "F",
+    "p": 0.509,
+    "description": "Indian actress"
+   },
+   {
+    "name": "Son Heung-min",
+    "rank": 532,
+    "gender": "M",
+    "p": 0.535,
+    "description": "South Korean association football player (born 1992)"
+   },
+   {
+    "name": "Claire Danes",
+    "rank": 539,
+    "gender": "F",
+    "p": 0.518,
+    "description": "American actor (born 1979)"
+   },
+   {
+    "name": "Emilio Estevez",
+    "rank": 970,
+    "gender": "M",
+    "p": 0.537,
+    "description": "American actor, director, and writer"
+   },
+   {
+    "name": "Jamie Foxx",
+    "rank": 1195,
+    "gender": "M",
+    "p": 0.561,
+    "description": "American actor, comedian, and singer (born 1967)"
+   },
+   {
+    "name": "Gemma Chan",
+    "rank": 1232,
+    "gender": "F",
+    "p": 0.662,
+    "description": "British actress (born 1982)"
+   },
+   {
+    "name": "Vera Farmiga",
+    "rank": 1292,
+    "gender": "F",
+    "p": 0.618,
+    "description": "American actress (born 1973)"
+   },
+   {
+    "name": "Laura Linney",
+    "rank": 1299,
+    "gender": "F",
+    "p": 0.659,
+    "description": "American actress"
+   },
+   {
+    "name": "Giuliano Simeone",
+    "rank": 1356,
+    "gender": "M",
+    "p": 0.839,
+    "description": "Argentine footballer (born 2002)"
+   },
+   {
+    "name": "Kesha",
+    "rank": 1463,
+    "gender": "F",
+    "p": 0.536,
+    "description": "American singer and songwriter (born 1987)"
+   },
+   {
+    "name": "Steven Yeun",
+    "rank": 1577,
+    "gender": "M",
+    "p": 0.608,
+    "description": "South Korean-American actor"
+   },
+   {
+    "name": "Eliza Dushku",
+    "rank": 1651,
+    "gender": "F",
+    "p": 0.547,
+    "description": "American actress"
+   },
+   {
+    "name": "Isabela Merced",
+    "rank": 1952,
+    "gender": "F",
+    "p": 0.528,
+    "description": "American actress and singer (born 2001)"
+   },
+   {
+    "name": "Alanna Ubach",
+    "rank": 1965,
+    "gender": "F",
+    "p": 0.629,
+    "description": "American actress (born 1975)"
+   },
+   {
+    "name": "Spike Jonze",
+    "rank": 1983,
+    "gender": "M",
+    "p": 0.509,
+    "description": "American filmmaker (born 1969)"
+   },
+   {
+    "name": "Jessica Henwick",
+    "rank": 1989,
+    "gender": "F",
+    "p": 0.588,
+    "description": "British actress"
+   },
+   {
+    "name": "Masiela Lusha",
+    "rank": 2050,
+    "gender": "F",
+    "p": 0.642,
+    "description": "Albanian American actress and author"
+   },
+   {
+    "name": "Emma Myers",
+    "rank": 2197,
+    "gender": "F",
+    "p": 0.698,
+    "description": "American actress (born 2002)"
+   },
+   {
+    "name": "Lisandro Martínez",
+    "rank": 2507,
+    "gender": "M",
+    "p": 0.578,
+    "description": "Argentine association football player"
+   },
+   {
+    "name": "Melissa O'Neil",
+    "rank": 2763,
+    "gender": "F",
+    "p": 0.514,
+    "description": "Canadian singer and actress (born 1988)"
+   },
+   {
+    "name": "Tomer Capone",
+    "rank": 2792,
+    "gender": "M",
+    "p": 0.5,
+    "description": "Israeli actor"
+   },
+   {
+    "name": "Jackson Browne",
+    "rank": 2927,
+    "gender": "M",
+    "p": 0.637,
+    "description": "American singer-songwriter"
+   },
+   {
+    "name": "Lisa Rinna",
+    "rank": 3120,
+    "gender": "F",
+    "p": 0.586,
+    "description": "actor, writer"
+   },
+   {
+    "name": "Temple Grandin",
+    "rank": 3225,
+    "gender": "F",
+    "p": 0.53,
+    "description": "American doctor of animal science, author, and autism activist"
+   },
+   {
+    "name": "Katie Cassidy",
+    "rank": 3260,
+    "gender": "F",
+    "p": 0.53,
+    "description": "American actress and singer (born 1986)"
+   },
+   {
+    "name": "Kaja Kallas",
+    "rank": 3267,
+    "gender": "F",
+    "p": 0.633,
+    "description": "Estonian politician and former prime minister of Estonia (born 1977)"
+   },
+   {
+    "name": "Lee Min-ho",
+    "rank": 3317,
+    "gender": "M",
+    "p": 0.517,
+    "description": "South Korean actor, singer and model"
+   },
+   {
+    "name": "Victoria Pedretti",
+    "rank": 3403,
+    "gender": "F",
+    "p": 0.541,
+    "description": "American actress"
+   },
+   {
+    "name": "Kim Mu-yeol",
+    "rank": 3430,
+    "gender": "M",
+    "p": 0.533,
+    "description": "South Korean actor"
+   },
+   {
+    "name": "Jamie Chung",
+    "rank": 3505,
+    "gender": "F",
+    "p": 0.602,
+    "description": "American actress"
+   },
+   {
+    "name": "Sophie, Duchess of Edinburgh",
+    "rank": 3519,
+    "gender": "F",
+    "p": 0.541,
+    "description": "British Royal, wife of Prince Edward, Duke of Edinburgh"
+   },
+   {
+    "name": "Raadhika Sarathkumar",
+    "rank": 4037,
+    "gender": "F",
+    "p": 0.56,
+    "description": "Indian actress"
+   },
+   {
+    "name": "Son Ye-jin",
+    "rank": 4047,
+    "gender": "F",
+    "p": 0.563,
+    "description": "South Korean actress"
+   },
+   {
+    "name": "Sara Ali Khan",
+    "rank": 4176,
+    "gender": "F",
+    "p": 0.507,
+    "description": "Indian actress (born 1995)"
+   },
+   {
+    "name": "Lim Ji-yeon",
+    "rank": 4248,
+    "gender": "F",
+    "p": 0.677,
+    "description": "South Korean actress (born 1990)"
+   },
+   {
+    "name": "Ha Young",
+    "rank": 4275,
+    "gender": "F",
+    "p": 0.611,
+    "description": "South Korean actress and model"
+   },
+   {
+    "name": "Kathy Najimy",
+    "rank": 4750,
+    "gender": "F",
+    "p": 0.713,
+    "description": "American actress"
+   },
+   {
+    "name": "Megan Skiendiel",
+    "rank": 4756,
+    "gender": "F",
+    "p": 0.559,
+    "description": "American singer, dancer and actress (born 2006)"
+   }
+  ],
+  "triangle": [
+   {
+    "name": "Keir Starmer",
+    "rank": 33,
+    "gender": "M",
+    "p": 0.546,
+    "description": "Prime Minister of the United Kingdom from 2024 to 2026"
+   },
+   {
+    "name": "Keanu Reeves",
+    "rank": 66,
+    "gender": "M",
+    "p": 0.678,
+    "description": "Canadian actor and musician (born 1964)"
+   },
+   {
+    "name": "Kurt Russell",
+    "rank": 110,
+    "gender": "M",
+    "p": 0.505,
+    "description": "American actor (born 1951)"
+   },
+   {
+    "name": "Ben Affleck",
+    "rank": 140,
+    "gender": "M",
+    "p": 0.547,
+    "description": "American film actor, director and screenwriter (born 1972)"
+   },
+   {
+    "name": "John Travolta",
+    "rank": 188,
+    "gender": "M",
+    "p": 0.807,
+    "description": "American actor (born 1954)"
+   },
+   {
+    "name": "Gwyneth Paltrow",
+    "rank": 248,
+    "gender": "F",
+    "p": 0.665,
+    "description": "American actress, entrepreneur, writer and singer (born 1972)"
+   },
+   {
+    "name": "Geena Davis",
+    "rank": 286,
+    "gender": "F",
+    "p": 0.511,
+    "description": "American actress (born 1956)"
+   },
+   {
+    "name": "Daryl Hannah",
+    "rank": 312,
+    "gender": "F",
+    "p": 0.796,
+    "description": "American actress and director (born 1960)"
+   },
+   {
+    "name": "Martin Short",
+    "rank": 356,
+    "gender": "M",
+    "p": 0.506,
+    "description": "Canadian comedian and actor (born 1950)"
+   },
+   {
+    "name": "Jodie Foster",
+    "rank": 366,
+    "gender": "F",
+    "p": 0.87,
+    "description": "American actress and filmmaker (born 1962)"
+   },
+   {
+    "name": "Will Ferrell",
+    "rank": 521,
+    "gender": "M",
+    "p": 0.518,
+    "description": "American actor, comedian, screenwriter and producer (born 1967)"
+   },
+   {
+    "name": "Magic Johnson",
+    "rank": 525,
+    "gender": "M",
+    "p": 0.647,
+    "description": "American basketball player and entrepreneur (born 1959)"
+   },
+   {
+    "name": "Kaká",
+    "rank": 538,
+    "gender": "M",
+    "p": 0.69,
+    "description": "Brazilian association football player (born 1982)"
+   },
+   {
+    "name": "Olivia Munn",
+    "rank": 548,
+    "gender": "F",
+    "p": 0.565,
+    "description": "American actress, comedian, television personality and author"
+   },
+   {
+    "name": "Jim Caviezel",
+    "rank": 581,
+    "gender": "M",
+    "p": 0.516,
+    "description": "American actor"
+   },
+   {
+    "name": "Ali Larter",
+    "rank": 604,
+    "gender": "F",
+    "p": 0.875,
+    "description": "American actress and model (born 1976)"
+   },
+   {
+    "name": "Timothy Olyphant",
+    "rank": 615,
+    "gender": "M",
+    "p": 0.535,
+    "description": "American actor"
+   },
+   {
+    "name": "Martin Sheen",
+    "rank": 634,
+    "gender": "M",
+    "p": 0.671,
+    "description": "American actor (born 1940)"
+   },
+   {
+    "name": "Laura Dern",
+    "rank": 722,
+    "gender": "F",
+    "p": 0.744,
+    "description": "American actress and producer (born 1967)"
+   },
+   {
+    "name": "Matt Smith",
+    "rank": 723,
+    "gender": "M",
+    "p": 0.734,
+    "description": "English actor (born 1982)"
+   },
+   {
+    "name": "Miles Teller",
+    "rank": 726,
+    "gender": "M",
+    "p": 0.504,
+    "description": "American actor"
+   },
+   {
+    "name": "John Stones",
+    "rank": 825,
+    "gender": "M",
+    "p": 0.699,
+    "description": "English footballer (born 1994)"
+   },
+   {
+    "name": "Sachin Tendulkar",
+    "rank": 872,
+    "gender": "M",
+    "p": 0.605,
+    "description": "Indian cricket player (born 1973)"
+   },
+   {
+    "name": "Lucy Liu",
+    "rank": 886,
+    "gender": "F",
+    "p": 0.62,
+    "description": "American actress (born 1968)"
+   },
+   {
+    "name": "Cobie Smulders",
+    "rank": 928,
+    "gender": "F",
+    "p": 0.583,
+    "description": "Canadian actress and model (born 1982)"
+   },
+   {
+    "name": "Scott Bessent",
+    "rank": 968,
+    "gender": "M",
+    "p": 0.506,
+    "description": "United States Secretary of the Treasury"
+   },
+   {
+    "name": "Enrique Iglesias",
+    "rank": 1009,
+    "gender": "M",
+    "p": 0.717,
+    "description": "Spanish singer, songwriter and producer (born 1975)"
+   },
+   {
+    "name": "Jack Schlossberg",
+    "rank": 1076,
+    "gender": "M",
+    "p": 0.648,
+    "description": "American writer and political correspondent (born 1993)"
+   },
+   {
+    "name": "Russell Brand",
+    "rank": 1096,
+    "gender": "M",
+    "p": 0.573,
+    "description": "English comedian, actor, and podcaster (born 1975)"
+   },
+   {
+    "name": "Bam Adebayo",
+    "rank": 1113,
+    "gender": "M",
+    "p": 0.501,
+    "description": "American basketball player (born 1997)"
+   },
+   {
+    "name": "Sia",
+    "rank": 1131,
+    "gender": "F",
+    "p": 0.51,
+    "description": "Australian singer and songwriter (born 1975)"
+   },
+   {
+    "name": "Ludwig Göransson",
+    "rank": 1151,
+    "gender": "M",
+    "p": 0.575,
+    "description": "Swedish musician and composer"
+   },
+   {
+    "name": "Eddie Vedder",
+    "rank": 1186,
+    "gender": "M",
+    "p": 0.586,
+    "description": "American singer and guitarist"
+   },
+   {
+    "name": "Wayne Gretzky",
+    "rank": 1210,
+    "gender": "M",
+    "p": 0.522,
+    "description": "Canadian ice hockey player and coach (born 1961)"
+   },
+   {
+    "name": "Minnie Driver",
+    "rank": 1215,
+    "gender": "F",
+    "p": 0.954,
+    "description": "British-American actress (born 1970)"
+   },
+   {
+    "name": "David Duchovny",
+    "rank": 1235,
+    "gender": "M",
+    "p": 0.858,
+    "description": "American actor and writer"
+   },
+   {
+    "name": "Joni Mitchell",
+    "rank": 1254,
+    "gender": "F",
+    "p": 0.722,
+    "description": "Canadian musician"
+   },
+   {
+    "name": "John Cleese",
+    "rank": 1260,
+    "gender": "M",
+    "p": 0.519,
+    "description": "English comedian and actor (born 1939)"
+   },
+   {
+    "name": "Charles Melton",
+    "rank": 1261,
+    "gender": "M",
+    "p": 0.586,
+    "description": "American actor (born 1991)"
+   },
+   {
+    "name": "Léa Seydoux",
+    "rank": 1323,
+    "gender": "F",
+    "p": 0.548,
+    "description": "French actress (born 1985)"
+   }
+  ]
+ }
+}

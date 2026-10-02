@@ -1,0 +1,67 @@
+{
+ "_about": "Published stylist claims 'X has a <shape> face', collected 2026-10-01 (names only, no images). Used by face_shape_fit.py to check and fit the scanner's shape prototypes. A name listed under two shapes is a conflict and is dropped unless one shape has more sources.",
+ "sources": {
+  "ofs": "https://ovalfaceshape.com/celebrity-face-shapes/",
+  "gs": "https://www.glassesshop.com/blog/celebrities-face-shapes",
+  "vou": "https://thevou.com/blog/ (oval/round/square/oblong/heart/diamond/pear-face-shape-male-celebrities)",
+  "fab": "https://fabbon.com/articles/makeup/celebrities-with-oval-faces",
+  "dia": "https://www.diaminy.com/square-jaw-female-celebrities/",
+  "yb": "https://www.youbeauty.com/beauty/celebrities-with-heart-face-shapes/",
+  "obl": "https://oblongfaceshape.com/oblong-face-shape-celebrities-male/",
+  "vph": "https://vogue.ph/beauty/26-best-haircuts-for-a-round-face-as-inspired-by-celebrities/",
+  "pm": "https://pinkmirror.com/person/Feature/unisex/face-shape/<shape>",
+  "srch": "web search summaries of the lists above and ranker.com/calistylie face-shape lists"
+ },
+ "labels": {
+  "oval": {
+   "ofs": ["Beyoncé", "George Clooney", "Jessica Alba", "Ryan Gosling", "Idris Elba", "Michael Jordan"],
+   "gs": ["Dwayne Johnson", "Leighton Meester", "Vin Diesel", "Leona Lewis"],
+   "vou": ["Michael Jordan", "Ryan Gosling", "Jake Gyllenhaal", "Idris Elba", "John Legend", "Chris Evans", "Chris Pratt", "Dev Patel", "Justin Bieber", "Cole Sprouse"],
+   "fab": ["Rihanna", "Beyoncé", "Natalie Portman", "Cameron Diaz", "Courteney Cox", "Julia Roberts", "Emma Watson", "Blake Lively", "Catherine, Princess of Wales", "Jennifer Aniston", "Kristen Stewart", "Salma Hayek", "Dakota Johnson", "Jennifer Lawrence", "Katherine Langford", "Zoey Deutch", "Priyanka Chopra", "Tyra Banks", "Elizabeth Olsen", "Millie Bobby Brown", "Charlize Theron", "Ashley Greene", "Emily Blunt", "Minka Kelly"],
+   "pm": ["Joy", "Rosé", "IU", "Lisa", "Nneka Ogwumike", "Park Shin-hye", "V", "Jin", "Barack Obama", "Song Joong-ki"],
+   "srch": ["Bella Hadid", "Zendaya", "Kim Kardashian", "Anne Hathaway"]
+  },
+  "round": {
+   "ofs": ["Selena Gomez", "Adele", "Chrissy Teigen", "Emma Stone", "Leonardo DiCaprio", "Jack Black", "Channing Tatum"],
+   "gs": ["Ariel Winter", "Benedict Wong", "Emma Stone", "Ed Sheeran"],
+   "vou": ["Leonardo DiCaprio", "Elijah Wood", "Ed Sheeran", "Aaron Paul", "James Corden", "John Bradley", "Jeremy Renner", "Alfred Enoch", "Ronny Chieng", "Usher"],
+   "vph": ["Mila Kunis", "Kirsten Dunst", "Lupita Nyong'o", "Kate Bosworth", "Emma Stone", "Cameron Diaz", "Gemma Chan", "Drew Barrymore", "Michelle Williams", "Selena Gomez", "Miranda Kerr", "Gabrielle Union", "Chrissy Teigen", "Jennifer Hudson", "Ginnifer Goodwin", "Isla Fisher", "Natasha Lyonne", "Taraji P. Henson", "Christina Ricci", "Viola Davis", "Sarah Hyland", "Billie Eilish", "Jennifer Lawrence", "Joey King", "Penélope Cruz", "Zendaya"],
+   "srch": ["Gigi Hadid", "Kate Upton", "Lana Condor", "Mindy Kaling", "Jisoo"]
+  },
+  "square": {
+   "ofs": ["Angelina Jolie", "Olivia Wilde", "Keira Knightley", "Sandra Bullock", "Henry Cavill", "Arnold Schwarzenegger", "Matt Damon"],
+   "gs": ["Joe Keery", "Zac Efron", "Elizabeth Debicki", "Margot Robbie"],
+   "vou": ["Taron Egerton", "Daniel Radcliffe", "Pedro Pascal", "Johnny Depp", "Michael B. Jordan", "Charles Melton", "Tom Hardy", "Gerard Butler", "Mark Wahlberg", "Daniel Dae Kim"],
+   "dia": ["Angelina Jolie", "Keira Knightley", "Olivia Wilde", "Margot Robbie", "Natalie Portman", "Zendaya", "Cara Delevingne"],
+   "srch": ["Jennifer Aniston", "Gwyneth Paltrow", "Zoë Kravitz", "Sebastian Stan", "Demi Moore", "Salma Hayek", "Minnie Driver"]
+  },
+  "oblong": {
+   "ofs": ["Sarah Jessica Parker", "Liv Tyler", "Meryl Streep", "Conan O'Brien", "Adam Driver", "Ben Stiller"],
+   "gs": ["David Beckham", "Paul Wesley", "Sebastian Stan", "Shawn Mendes", "Nikki Bella", "Jessica Alba", "Nick Cannon", "Josh Bowman"],
+   "vou": ["Shawn Mendes", "Paul Rudd", "Adam Levine", "Eric Balfour", "Keanu Reeves", "Eddie Redmayne", "Bill Skarsgård", "Benedict Cumberbatch", "Josh Duhamel", "Matthew McConaughey"],
+   "obl": ["Benedict Cumberbatch", "Ben Affleck", "Shawn Mendes", "Will Smith", "Paul Rudd", "Keanu Reeves", "Adam Levine", "Matthew McConaughey", "Jake Gyllenhaal", "Jude Law", "Tom Hiddleston", "Idris Elba", "Robert Pattinson", "Cillian Murphy", "Viggo Mortensen"],
+   "pm": ["Solange Knowles", "Ellie Goulding", "Nikki Bella", "Joanna Gaines", "Pink", "Jason Statham", "Geoffrey Rush", "Sam Rockwell", "Christopher Meloni", "Adam Sandler", "Bruce Willis", "Andy Cohen"],
+   "srch": ["Gisele Bündchen", "Emilia Clarke", "Tracee Ellis Ross", "Kate Beckinsale", "Tilda Swinton", "Keke Palmer", "Julianne Moore", "Cher", "Nicolas Cage"]
+  },
+  "heart": {
+   "ofs": ["Reese Witherspoon", "Jennifer Love Hewitt", "Kerry Washington", "Kourtney Kardashian", "Taylor Lautner"],
+   "gs": ["Anya Taylor-Joy", "Chris Colfer", "Dianna Agron", "Garrett Hedlund"],
+   "vou": ["Bradley Cooper", "Nick Jonas", "Donald Glover", "Jesse Williams", "Chris Hemsworth", "Henry Golding", "Chris Pine", "Ncuti Gatwa", "Ethan Hawke", "Daniel Craig"],
+   "yb": ["Halle Berry", "Reese Witherspoon", "Jennifer Love Hewitt", "Angela Bassett", "Zooey Deschanel", "Eva Longoria", "Ashley Olsen", "Scarlett Johansson", "Ashanti", "Sandra Oh", "Audrey Tautou"],
+   "srch": ["Harry Styles", "Florence Pugh", "Kylie Jenner", "Sydney Sweeney", "Naomi Campbell", "Lili Reinhart", "Constance Wu"]
+  },
+  "diamond": {
+   "ofs": ["Rihanna", "Scarlett Johansson", "Tyra Banks", "Megan Fox", "Halle Berry", "Zendaya", "Johnny Depp", "Robert Pattinson"],
+   "gs": ["Halle Berry", "Eva Green", "Johnny Depp", "Tye Sheridan"],
+   "vou": ["Robert Pattinson", "Zayn Malik", "Jared Leto", "Ezra Miller", "Michiel Huisman", "Cillian Murphy", "Channing Tatum", "Mahershala Ali", "Maluma", "Jimmy Butler"],
+   "srch": ["Jennifer Lopez", "Billie Eilish", "Selena Gomez", "Eiza González", "Vanessa Hudgens", "Tracee Ellis Ross", "Ashley Greene", "George Clooney", "David Beckham"]
+  },
+  "triangle": {
+   "ofs": ["Kelly Osbourne", "Minnie Driver", "James Spader"],
+   "gs": ["Amanda Seyfried", "Meghan, Duchess of Sussex", "Adam Lambert", "Edgar Ramírez", "Jonah Hill", "Ronnie Ortiz-Magro"],
+   "vou": ["Edgar Ramírez", "Jason Derulo", "Shahid Kapoor", "Ross Butler", "Romeo Santos", "Cuba Gooding Jr.", "Kanye West", "Matt Bomer", "Kumail Nanjiani", "John Krasinski"],
+   "pm": ["Melissa McCarthy", "Fantasia Barrino", "America Ferrera", "Martin Lawrence", "Jonah Hill", "Jon Favreau", "Kanye West", "LeBron James"],
+   "srch": ["Jennifer Lawrence", "Sarah Michelle Gellar", "Jennifer Love Hewitt", "Geena Davis", "Billie Piper", "Bette Midler", "Kevin Bacon"]
+  }
+ }
+}

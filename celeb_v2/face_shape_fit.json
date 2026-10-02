@@ -1,0 +1,154 @@
+{
+ "labelled": 186,
+ "per_shape": {
+  "oval": 34,
+  "round": 32,
+  "square": 22,
+  "diamond": 13,
+  "oblong": 38,
+  "heart": 27,
+  "triangle": 20
+ },
+ "conflicts_dropped": 20,
+ "not_in_index": 42,
+ "accuracy_hand": [
+  0.215,
+  0.419
+ ],
+ "accuracy_fitted_loo": [
+  0.269,
+  0.468
+ ],
+ "chance": 0.204,
+ "repeatable_hand": 0.228,
+ "repeatable_fitted": 0.239,
+ "people_with_2plus_photos": 2802,
+ "shares_hand": {
+  "oval": 21.2,
+  "round": 12.4,
+  "square": 11.5,
+  "oblong": 11.6,
+  "heart": 19.3,
+  "diamond": 10.3,
+  "triangle": 13.7
+ },
+ "shares_fitted": {
+  "oval": 7.6,
+  "round": 14.0,
+  "square": 12.7,
+  "oblong": 16.3,
+  "heart": 20.6,
+  "diamond": 8.7,
+  "triangle": 20.1
+ },
+ "prototypes_fitted": {
+  "oval": [
+   0.45,
+   0.15,
+   -0.43,
+   -0.35
+  ],
+  "round": [
+   -0.61,
+   0.04,
+   -0.1,
+   -0.08
+  ],
+  "square": [
+   -0.31,
+   -0.13,
+   0.41,
+   0.24
+  ],
+  "oblong": [
+   0.61,
+   0.06,
+   -0.05,
+   0.1
+  ],
+  "heart": [
+   0.11,
+   0.53,
+   -0.71,
+   -0.52
+  ],
+  "diamond": [
+   0.1,
+   -0.32,
+   -0.35,
+   -0.23
+  ],
+  "triangle": [
+   -0.14,
+   -0.66,
+   0.64,
+   0.31
+  ]
+ },
+ "conflicts": [
+  "ashley greene",
+  "billie eilish",
+  "cameron diaz",
+  "channing tatum",
+  "cillian murphy",
+  "david beckham",
+  "george clooney",
+  "jake gyllenhaal",
+  "jennifer aniston",
+  "jennifer lawrence",
+  "jessica alba",
+  "minnie driver",
+  "natalie portman",
+  "rihanna",
+  "salma hayek",
+  "scarlett johansson",
+  "sebastian stan",
+  "tracee ellis ross",
+  "tyra banks",
+  "zendaya"
+ ],
+ "missing": [
+  "adam levine",
+  "alfred enoch",
+  "ashley olsen",
+  "bella hadid",
+  "chris colfer",
+  "chrissy teigen",
+  "cole sprouse",
+  "courteney cox",
+  "daniel craig",
+  "edgar ramirez",
+  "eric balfour",
+  "fantasia barrino",
+  "isla fisher",
+  "james corden",
+  "james spader",
+  "jared leto",
+  "jennifer love hewitt",
+  "jeremy renner",
+  "jimmy butler",
+  "jin",
+  "joanna gaines",
+  "joe keery",
+  "joey king",
+  "john bradley",
+  "josh bowman",
+  "joy",
+  "kelly osbourne",
+  "leona lewis",
+  "martin lawrence",
+  "miranda kerr",
+  "naomi campbell",
+  "nick jonas",
+  "nneka ogwumike",
+  "romeo santos",
+  "ronnie ortiz magro",
+  "rose",
+  "ross butler",
+  "shawn mendes",
+  "solange knowles",
+  "usher",
+  "vanessa hudgens",
+  "zac efron"
+ ]
+}
