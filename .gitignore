@@ -90,3 +90,7 @@ backups/
 
 # Kirk meter reference photos (added by hand, uploaded to Modal with hf_space/)
 hf_space/kirk/
+
+# LFW evaluation crops (eval_lfw_aligned.py), rebuilt on demand
+lfw_aligned_cache/
+lfw_aligned_cache_yunet/
