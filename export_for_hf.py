@@ -6,10 +6,10 @@ Re-run whenever the model or celeb_v2/data change (e.g. after the top-up or a ta
     python export_for_hf.py
     cd hf_space && modal deploy modal_app.py
 
-Source: every celeb_v2/data/*/manifest.json with status "ok". Each photo is re-aligned with InsightFace
-around its verified face_box (the photo can hold other people) and embedded with app_best.pt, the model
-the server uses for the query. Aligned faces are cached per person (aligned.npz), so a rebuild only
-detects faces for new or changed people.
+Source: every celeb_v2/data/*/manifest.json with status "ok". Each photo is re-aligned with YuNet
+(yunet.py, copied next to the server, which aligns queries with it) around its verified face_box (the photo
+can hold other people) and embedded with app_best.pt, the model the server uses for the query. Aligned faces
+are cached per person (aligned_yunet.npz), so a rebuild only detects faces for new or changed people.
 index.npz, one row per photo: names, embeddings, genders ("F"/"M"/""), categories ("actor|musician"),
 credits (JSON: author, license, license_url, page) and known_for (the Wikidata description).
 """
@@ -25,6 +25,7 @@ import torch
 from PIL import Image, ImageOps
 
 sys.path.insert(0, "celeb_v2")
+import yunet                                         # noqa: E402
 from build_list import categories                    # noqa: E402  (celeb_v2)
 from collect import credit_license                   # noqa: E402
 from lfw_pytorch import EMBEDDING_SIZE, SphereFaceNet, test_transform
@@ -33,20 +34,8 @@ from lookalike import merge_duplicate_names
 OUT   = "hf_space"
 DATA  = "celeb_v2/data"
 LISTS = ["celeb_v2/celebs.json", "celeb_v2/topup.json"]
-COPY  = ["server.py", "lookalike.py", "face_features.py", "lfw_pytorch.py", "app_best.pt"]
+COPY  = ["server.py", "lookalike.py", "lfw_pytorch.py", "yunet.py", "face_detection_yunet_2023mar.onnx", "app_best.pt"]
 THUMB = 128
-
-_det = None
-
-
-def detector():
-    global _det
-    if _det is None:
-        from insightface.app import FaceAnalysis
-        _det = FaceAnalysis(allowed_modules=["detection"], providers=["CPUExecutionProvider"])
-        _det.prepare(ctx_id=-1, det_size=(320, 320))  # a crop around one face: small det_size is plenty
-    return _det
-
 
 def iou(a, b):
     w = max(0, min(a[2], b[2]) - max(a[0], b[0]))
@@ -56,23 +45,21 @@ def iou(a, b):
 
 def align(path, box):
     """-> 112x112 aligned face (uint8 RGB) of the verified face in `box`, or None."""
-    from insightface.utils.face_align import norm_crop
     rgb = np.asarray(Image.open(path).convert("RGB"))
     x1, y1, x2, y2 = box
     m = 0.6 * max(x2 - x1, y2 - y1)
     cx1, cy1 = int(max(0, x1 - m)), int(max(0, y1 - m))
     crop = np.ascontiguousarray(rgb[cy1:int(min(rgb.shape[0], y2 + m)), cx1:int(min(rgb.shape[1], x2 + m))])
     want = [x1 - cx1, y1 - cy1, x2 - cx1, y2 - cy1]
-    faces = detector().get(crop[:, :, ::-1])  # detector expects BGR
-    best = max(faces, key=lambda f: iou(f.bbox, want), default=None)
-    if best is None or iou(best.bbox, want) < 0.3:
+    best = max(yunet.faces(crop), key=lambda f: iou(f[0], want), default=None)
+    if best is None or iou(best[0], want) < 0.3:
         return None
-    return norm_crop(crop, best.kps, image_size=112)
+    return yunet.align(crop, best[1])
 
 
 def aligned_faces(folder, manifest):
     """-> (files, faces uint8 [N,112,112,3]) for the manifest's photos, cached in aligned.npz."""
-    path = os.path.join(folder, "aligned.npz")
+    path = os.path.join(folder, "aligned_yunet.npz")
     files = [i["file"] for i in manifest["images"]]
     if os.path.exists(path):
         with np.load(path) as d:

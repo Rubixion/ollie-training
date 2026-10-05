@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
-# build-essential: insightface compiles a small C extension; libgl1/libglib2.0-0: OpenCV runtime libs
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential libgl1 libglib2.0-0 \
+# libgl1/libglib2.0-0: OpenCV runtime libs; libegl1/libgles2: MediaPipe
+RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libegl1 libgles2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Hugging Face runs Spaces as uid 1000
@@ -14,9 +14,6 @@ COPY --chown=user requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY --chown=user . .
-
-# Bake the InsightFace detector (~280 MB download) into the image so cold starts don't fetch it
-RUN python -c "from face_features import _get_insight_app; _get_insight_app()"
 
 # Hosts pick the port via $PORT (Cloud Run: 8080, Railway, Fly); Hugging Face expects 7860
 EXPOSE 7860

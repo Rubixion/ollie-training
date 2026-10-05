@@ -3,7 +3,8 @@ Lookalike API for the Modal / Hugging Face Docker deployment (or any host).
 
     API_KEY=secret uvicorn server:app --port 7860
 
-POST /search   multipart: "file" (photo), optional "gender" = any | female | male | auto (default any),
+POST /search   multipart: "file" (photo), optional "gender" = any | female | male (default any; "auto" = any,
+               the face-based gender guess was removed with InsightFace on 2026-10-04),
                optional "category" = any | actor | musician | footballer (default any)
                header "X-Api-Key"
   -> {"face_found": bool,
@@ -23,9 +24,6 @@ POST /compare  multipart: "file", "file2", header "X-Api-Key" (the hidden /compa
 POST /landmarks  multipart: "file", header "X-Api-Key" (the ChatGPT apps: face symmetry test and Ollie Stylist)
   -> {"face_found": bool, "width", "height", "yaw", "pitch", "landmarks": [[x, y], ... 478, normalised 0..1]}
      MediaPipe Face Landmarker, the same model the browser runs, so lib/symmetry.ts and lib/style/face-shape.ts work unchanged.
-
-POST /style-scan  multipart: "file", header "X-Api-Key" (the hidden /style page)
-  -> {"face_found": bool, "age": int | None, "gender": "female" | "male" | None}   # InsightFace apparent age/sex
 
 One mode only (the skin-tone filter is gone). Its key stays "CNN Only (best image)" so frontends
 built before this change still find it; new frontends just take the first mode.
@@ -47,7 +45,7 @@ import torch
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from PIL import Image
 
-from face_features import _get_insight_app, face_and_sex
+import yunet  # face detection + alignment (YuNet, MIT); replaced InsightFace (non-commercial weights)
 from lfw_pytorch import EMBEDDING_SIZE, SphereFaceNet, test_transform
 from lookalike import merge_duplicate_names, rank_players, thumb_name
 
@@ -81,10 +79,13 @@ with np.load(os.path.join(HERE, "index.npz")) as d:
 
 
 def _embed(img):
-    """PIL RGB image -> (embedding, sex, face found, aligned face)."""
-    face, sex, found = face_and_sex(img)
+    """PIL RGB image -> (embedding, face found, aligned face). The largest face, aligned like the index
+    (yunet.py, also used by export_for_hf.py); no face = the whole image, flagged face_found False."""
+    rgb = np.array(img.convert("RGB"))
+    found = yunet.faces(rgb)
+    face = Image.fromarray(yunet.align(rgb, found[0][1])) if found else img
     with torch.no_grad():
-        return model.get_embedding(test_transform(face).unsqueeze(0)).numpy()[0], sex, found, face
+        return model.get_embedding(test_transform(face).unsqueeze(0)).numpy()[0], bool(found), face
 
 
 def _data_url(img):
@@ -98,7 +99,7 @@ def _data_url(img):
 KIRK_EMBS, KIRK_THUMBS = [], []
 for _f in sorted(os.listdir(os.path.join(HERE, "kirk")) if os.path.isdir(os.path.join(HERE, "kirk")) else []):
     try:
-        _emb, _, _found, _face = _embed(Image.open(os.path.join(HERE, "kirk", _f)).convert("RGB"))
+        _emb, _found, _face = _embed(Image.open(os.path.join(HERE, "kirk", _f)).convert("RGB"))
     except Exception:
         continue
     if _found:
@@ -107,7 +108,7 @@ for _f in sorted(os.listdir(os.path.join(HERE, "kirk")) if os.path.isdir(os.path
 KIRK_EMBS = np.array(KIRK_EMBS, dtype=np.float32)
 print(f"kirk meter: {len(KIRK_THUMBS)} reference photos", flush=True)
 
-# ponytail: one search at a time (CPU-bound anyway, and the InsightFace session isn't shared-safe);
+# ponytail: one search at a time (CPU-bound anyway);
 # run more than one worker/replica if this ever queues up.
 _lock = threading.Lock()
 app   = FastAPI()
@@ -123,10 +124,10 @@ def _thumb(player, idx):
     return None
 
 
-def _allowed(gender, sex):
+def _allowed(gender):
     """-> (bool mask per image or None, the gender filtered to or None). Only people whose recorded
     gender is known and different are left out; unknown/other genders are always shown."""
-    want = GENDER.get(gender, sex if gender == "auto" else None)
+    want = GENDER.get(gender)  # "auto"/"any"/unknown = no filter
     if GENDERS is None or want is None:
         return None, None
     return GENDERS != ("M" if want == "F" else "F"), {"F": "female", "M": "male"}[want]
@@ -166,7 +167,7 @@ def kirk(file: UploadFile = File(...), x_api_key: str = Header(default="")):
     if not KIRK_THUMBS:
         raise HTTPException(503, "No kirk/ reference photos loaded")
     with _lock:
-        q_emb, _, found, _ = _embed(img)
+        q_emb, found, _ = _embed(img)
     _, score, i = rank_players(["kirk"] * len(KIRK_EMBS), np.linalg.norm(KIRK_EMBS - q_emb, axis=1), SCORE)[0]
     return {"face_found": found, "score": round(score, 1), "thumb": KIRK_THUMBS[i]}
 
@@ -176,8 +177,8 @@ def compare(file: UploadFile = File(...), file2: UploadFile = File(...), x_api_k
     """Hidden /compare page: two photos -> {"face_found": [bool, bool], "score": raw percent (same scale as /search)}"""
     a, b = _read_upload(file, x_api_key), _read_upload(file2, x_api_key)
     with _lock:
-        emb_a, _, found_a, _ = _embed(a)
-        emb_b, _, found_b, _ = _embed(b)
+        emb_a, found_a, _ = _embed(a)
+        emb_b, found_b, _ = _embed(b)
     _, score, _ = rank_players(["b"], [np.linalg.norm(emb_a - emb_b)], "best")[0]
     return {"face_found": [found_a, found_b], "score": round(score, 1)}
 
@@ -215,31 +216,15 @@ def landmarks(file: UploadFile = File(...), x_api_key: str = Header(default=""))
     }
 
 
-@app.post("/style-scan")
-def style_scan(file: UploadFile = File(...), x_api_key: str = Header(default="")):
-    """Hidden /style page: one camera frame -> {"face_found": bool, "age": int | None, "gender": "female" | "male" | None}.
-    InsightFace's apparent age (about ±5 years), used only to offer a "look older / younger" goal."""
-    img = _read_upload(file, x_api_key)
-    fa = _get_insight_app()
-    if fa is None:
-        raise HTTPException(503, "Face model not loaded")
-    with _lock:
-        faces = fa.get(np.array(img)[:, :, ::-1])
-    if not faces:
-        return {"face_found": False, "age": None, "gender": None}
-    face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
-    return {"face_found": True, "age": int(face.age), "gender": {"F": "female", "M": "male"}.get(getattr(face, "sex", None))}
-
-
 @app.post("/search")
 def search(file: UploadFile = File(...), gender: str = Form("any"), category: str = Form("any"),
            x_api_key: str = Header(default="")):
     img = _read_upload(file, x_api_key)
 
     with _lock:
-        q_emb, sex, found, _ = _embed(img)
+        q_emb, found, _ = _embed(img)
         dist = np.linalg.norm(EMBS - q_emb, axis=1)
-        allowed, gender_used = _allowed(gender, sex)
+        allowed, gender_used = _allowed(gender)
         in_cat, category_used = _category(category)
         if in_cat is not None:
             allowed = in_cat if allowed is None else allowed & in_cat

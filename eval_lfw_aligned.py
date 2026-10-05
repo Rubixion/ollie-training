@@ -18,6 +18,7 @@ Usage:
     python eval_lfw_aligned.py                # evaluates app_checkpoint.pt
     python eval_lfw_aligned.py best            # evaluates app_best.pt
     python eval_lfw_aligned.py path/to/ckpt.pt # evaluates an explicit file
+    python eval_lfw_aligned.py best --yunet    # align with YuNet (yunet.py, what production uses)
 """
 
 import os
@@ -39,7 +40,10 @@ from lfw_pytorch import (
 APP_CHECKPOINT = "app_checkpoint.pt"
 APP_BEST       = "app_best.pt"
 ALIGN_SIZE     = 112
-ALIGN_CACHE    = "lfw_aligned_cache"
+YUNET          = "--yunet" in sys.argv
+if YUNET:
+    sys.argv.remove("--yunet")
+ALIGN_CACHE    = "lfw_aligned_cache_yunet" if YUNET else "lfw_aligned_cache"
 DET_SIZE       = (320, 320)   # small + fast on CPU; LFW faces are large in-frame
 
 
@@ -64,6 +68,8 @@ def load_test_pairs():
 
 
 def get_face_app():
+    if YUNET:
+        return None
     from insightface.app import FaceAnalysis
     app = FaceAnalysis(
         allowed_modules=['detection'],
@@ -86,6 +92,16 @@ def align_one(face_app, img_path):
     img_bgr = cv2.imread(img_path)
     if img_bgr is None:
         return None
+
+    if YUNET:
+        import yunet
+        found = yunet.faces(img_bgr[:, :, ::-1])
+        if not found:
+            return None
+        aligned = yunet.align(img_bgr, found[0][1], size=ALIGN_SIZE)
+        os.makedirs(ALIGN_CACHE, exist_ok=True)
+        cv2.imwrite(out_path, aligned)
+        return out_path
 
     faces = face_app.get(img_bgr)
     if not faces:
